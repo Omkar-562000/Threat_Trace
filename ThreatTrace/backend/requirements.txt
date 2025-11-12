@@ -1,0 +1,11 @@
+Flask
+Flask-Cors
+Flask-SocketIO
+Flask-JWT-Extended
+pymongo
+python-dotenv
+pandas
+scikit-learn
+requests
+reportlab
+bcrypt
