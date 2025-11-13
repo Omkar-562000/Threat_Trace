@@ -33,7 +33,7 @@ try:
     from routes.reports_routes import reports_bp
 
     # New Modules
-    from routes.ransomware_routes import ransom_bp
+    from routes.ransomware_routes import ransomware_bp
     from routes.audit_routes import audit_bp
 
     # Register Blueprints with prefixes
@@ -41,7 +41,7 @@ try:
     app.register_blueprint(alerts_bp, url_prefix="/api/alerts")
     app.register_blueprint(auth_bp, url_prefix="/api/auth")
     app.register_blueprint(reports_bp, url_prefix="/api/reports")
-    app.register_blueprint(ransom_bp, url_prefix="/api/ransomware")
+    app.register_blueprint(ransomware_bp, url_prefix="/api/ransomware")
     app.register_blueprint(audit_bp, url_prefix="/api/audit")
 
 except Exception as e:

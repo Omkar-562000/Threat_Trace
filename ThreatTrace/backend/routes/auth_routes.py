@@ -1,61 +1,51 @@
-from flask import Blueprint, request, jsonify
-from flask_bcrypt import Bcrypt
+from flask import Blueprint, request, jsonify, current_app
 from flask_jwt_extended import create_access_token
-from datetime import datetime
-from database.models import get_user_collection, serialize_user
+from werkzeug.security import generate_password_hash, check_password_hash
+from datetime import timedelta
 
 auth_bp = Blueprint("auth_bp", __name__)
-bcrypt = Bcrypt()
 
-@auth_bp.record
-def record_params(setup_state):
-    # Access the Flask app’s DB connection
-    app = setup_state.app
-    auth_bp.db = app.config.get("DB")
-
+# --- User Registration Route ---
 @auth_bp.route("/register", methods=["POST"])
-def register():
-    db = auth_bp.db
-    users = get_user_collection(db)
+def register_user():
     data = request.get_json()
-
     username = data.get("username")
-    email = data.get("email")
     password = data.get("password")
 
-    if not all([username, email, password]):
-        return jsonify({"error": "All fields are required"}), 400
+    if not username or not password:
+        return jsonify({"error": "Username and password are required"}), 400
 
-    if users.find_one({"email": email}):
-        return jsonify({"error": "User already exists"}), 400
+    db = current_app.config["DB"]
+    users_collection = db["users"]
 
-    hashed_pw = bcrypt.generate_password_hash(password).decode("utf-8")
-    user = {
+    if users_collection.find_one({"username": username}):
+        return jsonify({"error": "User already exists"}), 409
+
+    hashed_pw = generate_password_hash(password)
+    users_collection.insert_one({
         "username": username,
-        "email": email,
-        "password": hashed_pw,
-        "created_at": datetime.utcnow()
-    }
-    users.insert_one(user)
+        "password": hashed_pw
+    })
     return jsonify({"message": "User registered successfully"}), 201
 
-
+# --- Login Route ---
 @auth_bp.route("/login", methods=["POST"])
-def login():
-    db = auth_bp.db
-    users = get_user_collection(db)
+def login_user():
     data = request.get_json()
-
-    email = data.get("email")
+    username = data.get("username")
     password = data.get("password")
 
-    user = users.find_one({"email": email})
-    if not user or not bcrypt.check_password_hash(user["password"], password):
-        return jsonify({"error": "Invalid credentials"}), 401
+    db = current_app.config["DB"]
+    users_collection = db["users"]
+    user = users_collection.find_one({"username": username})
 
-    token = create_access_token(identity=str(user["_id"]))
-    return jsonify({
-        "message": "Login successful",
-        "token": token,
-        "user": serialize_user(user)
-    }), 200
+    if not user or not check_password_hash(user["password"], password):
+        return jsonify({"error": "Invalid username or password"}), 401
+
+    access_token = create_access_token(identity=username, expires_delta=timedelta(hours=1))
+    return jsonify({"message": "Login successful", "token": access_token}), 200
+
+# --- Test Route ---
+@auth_bp.route("/test", methods=["GET"])
+def test_auth():
+    return jsonify({"message": "Auth module active"})
