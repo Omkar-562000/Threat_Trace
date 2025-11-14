@@ -1,7 +1,7 @@
 {
   "name": "threattrace-frontend",
   "version": "0.0.1",
-  "type":"module",
+  "type": "module",
   "private": true,
   "scripts": {
     "dev": "vite",
@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@heroicons/react": "^2.2.0",
     "axios": "^1.4.0",
     "chart.js": "^4.4.0",
     "react": "^18.2.0",
@@ -16,7 +17,7 @@
     "react-dom": "^18.2.0",
     "react-globe.gl": "github:vasturiano/react-globe.gl",
     "react-router-dom": "^6.3.0",
-    "socket.io-client": "^4.6.1",
+    "socket.io-client": "^4.8.1",
     "three": "^0.161.0"
   },
   "devDependencies": {

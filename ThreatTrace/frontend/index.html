@@ -1,12 +1,44 @@
-<!doctype html>
-<html>
-  <head>
-    <meta charset="utf-8" />
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>ThreatTrace</title>
-  </head>
-  <body>
+
+    <!-- Tailwind CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Heroicons -->
+    <script src="https://unpkg.com/@heroicons/vue@2.0.18/dist/index.umd.js"></script>
+
+    <!-- Custom Tailwind Extension (for colors + fonts) -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        cyberPurple: "#a855f7",
+                        cyberNeon: "#00eaff",
+                        cyberDark: "#0a0f1f",
+                        cyberCard: "rgba(255,255,255,0.08)",
+                    },
+                    boxShadow: {
+                        neon: "0 0 25px #a855f7, 0 0 40px #00eaff",
+                    },
+                },
+            }
+        }
+    </script>
+
+    <!-- Custom Global Styles -->
+    <link rel="stylesheet" href="/src/index.css" />
+
+</head>
+
+<body class="bg-cyberDark text-white min-h-screen">
+
     <div id="root"></div>
+
     <script type="module" src="/src/main.jsx"></script>
-  </body>
+</body>
 </html>

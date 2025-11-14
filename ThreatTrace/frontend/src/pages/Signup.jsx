@@ -2,36 +2,39 @@ import axios from "axios";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-export default function Login() {
+export default function Signup() {
     const navigate = useNavigate();
 
     const [formData, setFormData] = useState({
+        name: "",
         email: "",
         password: "",
     });
 
     const [loading, setLoading] = useState(false);
     const [errorMsg, setErrorMsg] = useState("");
+    const [successMsg, setSuccessMsg] = useState("");
 
     const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
     };
 
-    const handleLogin = async (e) => {
+    const handleSignup = async (e) => {
         e.preventDefault();
         setLoading(true);
         setErrorMsg("");
+        setSuccessMsg("");
 
         try {
             const res = await axios.post(
-                "http://127.0.0.1:5000/api/auth/login",
+                "http://127.0.0.1:5000/api/auth/signup",
                 formData
             );
 
-            localStorage.setItem("token", res.data.token);
-            navigate("/dashboard");
+            setSuccessMsg("Account created successfully! Redirecting...");
+            setTimeout(() => navigate("/"), 1500);
         } catch (error) {
-            setErrorMsg("Invalid email or password");
+            setErrorMsg("Registration failed. Try again.");
         } finally {
             setLoading(false);
         }
@@ -39,21 +42,34 @@ export default function Login() {
 
     return (
         <div className="min-h-screen flex items-center justify-center">
-            
-            {/* Outer container with cyber glow */}
-            <div className="glass-cyber w-[380px] p-8 shadow-neon">
+
+            <div className="glass-cyber w-[400px] p-8 shadow-neon">
 
                 <h2 className="text-3xl cyber-gradient-text text-center mb-6">
-                    Welcome Back
+                    Create Account
                 </h2>
 
                 <p className="text-gray-300 text-center mb-6">
-                    Login to continue to <span className="neon-text">ThreatTrace</span>
+                    Join the <span className="neon-text">ThreatTrace</span> ecosystem
                 </p>
 
-                {/* Login Form */}
-                <form onSubmit={handleLogin} className="space-y-5">
+                <form onSubmit={handleSignup} className="space-y-5">
 
+                    {/* Name */}
+                    <div>
+                        <label className="text-sm text-gray-300">Full Name</label>
+                        <input
+                            type="text"
+                            name="name"
+                            placeholder="Enter your name"
+                            value={formData.name}
+                            onChange={handleChange}
+                            className="cyber-input mt-1"
+                            required
+                        />
+                    </div>
+
+                    {/* Email */}
                     <div>
                         <label className="text-sm text-gray-300">Email</label>
                         <input
@@ -67,12 +83,13 @@ export default function Login() {
                         />
                     </div>
 
+                    {/* Password */}
                     <div>
                         <label className="text-sm text-gray-300">Password</label>
                         <input
                             type="password"
                             name="password"
-                            placeholder="Enter your password"
+                            placeholder="Create a strong password"
                             value={formData.password}
                             onChange={handleChange}
                             className="cyber-input mt-1"
@@ -80,39 +97,36 @@ export default function Login() {
                         />
                     </div>
 
+                    {/* Messages */}
                     {errorMsg && (
                         <p className="text-red-400 text-sm text-center">{errorMsg}</p>
                     )}
 
+                    {successMsg && (
+                        <p className="text-green-400 text-sm text-center">{successMsg}</p>
+                    )}
+
+                    {/* Button */}
                     <button
                         type="submit"
                         disabled={loading}
                         className="cyber-btn w-full py-2 mt-2"
                     >
-                        {loading ? "Logging in..." : "Login"}
+                        {loading ? "Creating Account..." : "Sign Up"}
                     </button>
                 </form>
 
-                {/* Links Section */}
+                {/* Redirect Link */}
                 <div className="mt-6 text-center">
-
-                    <button
-                        onClick={() => navigate("/forgot-password")}
-                        className="text-cyberNeon hover:underline text-sm"
-                    >
-                        Forgot Password?
-                    </button>
-
-                    <p className="mt-3 text-sm text-gray-300">
-                        Don't have an account?{" "}
+                    <p className="text-sm text-gray-300">
+                        Already have an account?{" "}
                         <button
-                            onClick={() => navigate("/signup")}
+                            onClick={() => navigate("/")}
                             className="text-cyberPurple hover:underline"
                         >
-                            Create Account
+                            Login
                         </button>
                     </p>
-
                 </div>
             </div>
         </div>
