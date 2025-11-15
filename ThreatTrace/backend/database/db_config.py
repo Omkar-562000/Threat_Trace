@@ -1,18 +1,34 @@
+# backend/database/db_config.py
+
 from pymongo import MongoClient
+from urllib.parse import urlparse
 
 def init_db(app):
-    uri = app.config.get('MONGO_URI')
-    client = MongoClient(uri)
+    mongo_uri = app.config.get("MONGO_URI")
 
-    # Fix: Use explicit None check instead of truth value
-    db = client.get_default_database()
-    if db is None:
-        db = client["threattrace"]
+    if not mongo_uri:
+        raise Exception("❌ ERROR: MONGO_URI missing from environment variables (.env)")
 
     try:
-        client.admin.command('ping')
-        print(f"✅ MongoDB Connected Successfully: {db.name}")
+        # Connect to MongoDB
+        client = MongoClient(mongo_uri)
+
+        # Parse DB name from URI
+        parsed = urlparse(mongo_uri)
+        db_name = parsed.path.lstrip("/")  # remove leading '/'
+
+        # Fallback DB name
+        if not db_name:
+            db_name = "threattrace"
+
+        db = client[db_name]
+
+        # Ping MongoDB server
+        client.admin.command("ping")
+        print(f"⚡ MongoDB Connected Successfully → Database: {db_name}")
+
+        return db
+
     except Exception as e:
         print("❌ MongoDB Connection Failed:", e)
-
-    return db
+        raise e

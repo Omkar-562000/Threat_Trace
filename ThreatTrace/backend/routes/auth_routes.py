@@ -3,54 +3,23 @@
 from flask import Blueprint, request, jsonify, current_app
 from flask_bcrypt import Bcrypt
 from flask_jwt_extended import create_access_token
+from flask_mail import Message
 from datetime import datetime, timedelta
-from bson import ObjectId
 import uuid
-import smtplib
-from email.mime.text import MIMEText
 
 auth_bp = Blueprint("auth_bp", __name__)
 bcrypt = Bcrypt()
 
+mail = None   # Will be initialized from app.py
+
+
 # ------------------------------------------------------------
-# Helper: Send Email (Gmail SMTP)
+# INITIALIZE MAIL (called from app.py)
 # ------------------------------------------------------------
-def send_reset_email(to_email, reset_token):
-    try:
-        sender = current_app.config["MAIL_USERNAME"]
-        password = current_app.config["MAIL_PASSWORD"]
-
-        reset_link = f"http://localhost:5173/reset-password/{reset_token}"
-
-        msg = MIMEText(f"""
-        Hello,
-
-        You requested a password reset for your ThreatTrace account.
-
-        Click the link below to reset your password:
-        {reset_link}
-
-        If you did not request this, ignore this email.
-
-        Regards,
-        ThreatTrace Security Team
-        """)
-        msg["Subject"] = "ThreatTrace Password Reset"
-        msg["From"] = sender
-        msg["To"] = to_email
-
-        server = smtplib.SMTP(current_app.config["MAIL_SERVER"], current_app.config["MAIL_PORT"])
-        server.starttls()
-        server.login(sender, password)
-        server.sendmail(sender, to_email, msg.as_string())
-        server.quit()
-
-        print("📨 Reset email sent successfully!")
-        return True
-
-    except Exception as e:
-        print("❌ Email sending failed:", e)
-        return False
+def init_mail(app):
+    global mail
+    from flask_mail import Mail
+    mail = Mail(app)
 
 
 # ------------------------------------------------------------
@@ -62,18 +31,20 @@ def register():
         data = request.get_json()
 
         name = data.get("name")
-        email = data.get("email")
+        email = data.get("email", "").lower()
         password = data.get("password")
 
         if not name or not email or not password:
-            return jsonify({"status": "error", "message": "All fields required"}), 400
+            return jsonify({"status": "error", "message": "All fields are required"}), 400
 
         db = current_app.config["DB"]
         users = db["users"]
 
+        # Duplicate user?
         if users.find_one({"email": email}):
             return jsonify({"status": "error", "message": "Email already registered"}), 409
 
+        # Hash password
         hashed_pw = bcrypt.generate_password_hash(password).decode("utf-8")
 
         users.insert_one({
@@ -86,7 +57,8 @@ def register():
         return jsonify({"status": "success", "message": "Account created successfully"}), 201
 
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        print("❌ REGISTER ERROR:", e)
+        return jsonify({"status": "error", "message": "Registration failed"}), 500
 
 
 # ------------------------------------------------------------
@@ -96,21 +68,21 @@ def register():
 def login():
     try:
         data = request.get_json()
-        email = data.get("email")
+
+        email = data.get("email", "").lower()
         password = data.get("password")
 
         db = current_app.config["DB"]
         users = db["users"]
 
         user = users.find_one({"email": email})
-
         if not user:
             return jsonify({"status": "error", "message": "Invalid email or password"}), 401
 
         if not bcrypt.check_password_hash(user["password"], password):
             return jsonify({"status": "error", "message": "Invalid email or password"}), 401
 
-        # Create JWT token
+        # Create JWT
         token = create_access_token(
             identity=str(user["_id"]),
             expires_delta=timedelta(hours=12)
@@ -127,45 +99,82 @@ def login():
         }), 200
 
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        print("❌ LOGIN ERROR:", e)
+        return jsonify({"status": "error", "message": "Login failed"}), 500
 
 
 # ------------------------------------------------------------
-# FORGOT PASSWORD (EMAIL LINK)
+# SEND RESET EMAIL
+# ------------------------------------------------------------
+def send_reset_email(email, reset_token):
+    try:
+        reset_link = f"http://localhost:5173/reset-password?token={reset_token}"
+
+        msg = Message(
+            subject="ThreatTrace Password Reset",
+            sender=current_app.config["MAIL_USERNAME"],
+            recipients=[email]
+        )
+
+        msg.body = f"""
+Hello,
+
+We received a request to reset your password.
+
+Click the link below to reset your password:
+{reset_link}
+
+This link expires in 30 minutes.
+
+If this was not you, please ignore this email.
+
+— ThreatTrace Security Team
+"""
+
+        mail.send(msg)
+        print("📨 Reset email sent successfully.")
+        return True
+
+    except Exception as e:
+        print("❌ EMAIL SENDING ERROR:", e)
+        return False
+
+
+# ------------------------------------------------------------
+# FORGOT PASSWORD
 # ------------------------------------------------------------
 @auth_bp.route("/forgot-password", methods=["POST"])
 def forgot_password():
     try:
-        data = request.get_json()
-        email = data.get("email")
+        email = request.json.get("email", "").lower()
 
         db = current_app.config["DB"]
         users = db["users"]
 
         user = users.find_one({"email": email})
-
         if not user:
             return jsonify({"status": "error", "message": "Email not registered"}), 404
 
+        # Generate token
         reset_token = str(uuid.uuid4())
+        expiry = datetime.utcnow() + timedelta(minutes=30)
 
         users.update_one(
             {"_id": user["_id"]},
             {"$set": {
                 "reset_token": reset_token,
-                "reset_token_expiry": datetime.utcnow() + timedelta(minutes=30)
+                "reset_token_expiry": expiry
             }}
         )
 
-        email_sent = send_reset_email(email, reset_token)
-
-        if not email_sent:
-            return jsonify({"status": "error", "message": "Email sending failed"}), 500
+        if not send_reset_email(email, reset_token):
+            return jsonify({"status": "error", "message": "Failed to send reset email"}), 500
 
         return jsonify({"status": "success", "message": "Reset link sent to your email"}), 200
 
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        print("❌ FORGOT PASSWORD ERROR:", e)
+        return jsonify({"status": "error", "message": "Server Error"}), 500
 
 
 # ------------------------------------------------------------
@@ -184,21 +193,24 @@ def reset_password(token):
         users = db["users"]
 
         user = users.find_one({"reset_token": token})
-
         if not user:
             return jsonify({"status": "error", "message": "Invalid or expired token"}), 400
 
-        if user.get("reset_token_expiry") < datetime.utcnow():
+        if user["reset_token_expiry"] < datetime.utcnow():
             return jsonify({"status": "error", "message": "Reset link expired"}), 400
 
         hashed_pw = bcrypt.generate_password_hash(new_password).decode("utf-8")
 
         users.update_one(
             {"_id": user["_id"]},
-            {"$set": {"password": hashed_pw}, "$unset": {"reset_token": "", "reset_token_expiry": ""}}
+            {
+                "$set": {"password": hashed_pw},
+                "$unset": {"reset_token": "", "reset_token_expiry": ""}
+            }
         )
 
-        return jsonify({"status": "success", "message": "Password reset successfully"}), 200
+        return jsonify({"status": "success", "message": "Password reset successful"}), 200
 
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        print("❌ RESET PASSWORD ERROR:", e)
+        return jsonify({"status": "error", "message": "Password reset failed"}), 500

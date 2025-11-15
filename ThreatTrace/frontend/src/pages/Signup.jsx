@@ -27,14 +27,18 @@ export default function Signup() {
 
         try {
             const res = await axios.post(
-                "http://127.0.0.1:5000/api/auth/signup",
+                "http://127.0.0.1:5000/api/auth/register",
                 formData
             );
 
             setSuccessMsg("Account created successfully! Redirecting...");
             setTimeout(() => navigate("/"), 1500);
+
         } catch (error) {
-            setErrorMsg("Registration failed. Try again.");
+            console.log("Signup Error:", error);
+            setErrorMsg(
+                error.response?.data?.message || "Registration failed. Try again."
+            );
         } finally {
             setLoading(false);
         }
@@ -98,13 +102,8 @@ export default function Signup() {
                     </div>
 
                     {/* Messages */}
-                    {errorMsg && (
-                        <p className="text-red-400 text-sm text-center">{errorMsg}</p>
-                    )}
-
-                    {successMsg && (
-                        <p className="text-green-400 text-sm text-center">{successMsg}</p>
-                    )}
+                    {errorMsg && <p className="text-red-400 text-sm text-center">{errorMsg}</p>}
+                    {successMsg && <p className="text-green-400 text-sm text-center">{successMsg}</p>}
 
                     {/* Button */}
                     <button
@@ -112,7 +111,7 @@ export default function Signup() {
                         disabled={loading}
                         className="cyber-btn w-full py-2 mt-2"
                     >
-                        {loading ? "Creating Account..." : "Sign Up"}
+                        {loading ? "Creating account..." : "Sign Up"}
                     </button>
                 </form>
 
