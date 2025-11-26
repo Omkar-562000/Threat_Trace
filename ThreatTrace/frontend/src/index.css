@@ -113,3 +113,57 @@ body {
     border: 1px solid rgba(168, 85, 247, 0.7);
     box-shadow: 0 0 15px rgba(168, 85, 247, 0.5);
 }
+
+/* ---- animation for toast ---- */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-fadeIn { animation: fadeIn 0.28s ease-out; }
+
+/* custom scrollbar (keep if you already have) */
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: #0d1225; }
+::-webkit-scrollbar-thumb { background: #6b21a8; border-radius: 20px; }
+::-webkit-scrollbar-thumb:hover { background: #9333ea; }
+
+/* small helpful utilities */
+.bg-cyberDark { background-color: #0a0f1f; color: #fff; }
+.text-cyberNeon { color: #00eaff; }
+
+.audit-table td, .audit-table th {
+    white-space: nowrap;
+    vertical-align: middle;
+}
+
+/* Audit table helpers */
+.audit-table th, .audit-table td {
+  padding: 12px 10px;
+  border-bottom: 1px solid rgba(255,255,255,0.03);
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.audit-table thead th {
+  color: #cbd5e1;
+  font-weight: 700;
+  background: rgba(255,255,255,0.02);
+}
+
+.audit-table tbody tr:hover {
+  background: rgba(255,255,255,0.02);
+}
+
+/* Ensure buttons in table shrink properly */
+.audit-table .cyber-btn {
+  padding: 8px 10px;
+  font-size: 13px;
+}
+
+/* Optional: responsive */
+@media (max-width: 880px) {
+  .audit-table td:nth-child(2), /* hide columns on very small screens if needed */
+  .audit-table th:nth-child(2) {
+    display: none;
+  }
+}

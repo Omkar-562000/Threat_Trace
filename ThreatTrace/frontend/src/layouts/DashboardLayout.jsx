@@ -1,26 +1,29 @@
 // src/layouts/DashboardLayout.jsx
-import Sidebar from "../components/Sidebar.jsx";
-import TopNavbar from "../components/TopNavbar.jsx";
+import Sidebar from "../components/ui/Sidebar";
+import TopNavbar from "../components/ui/TopNavbar";
 
 export default function DashboardLayout({ children }) {
   return (
-    <div className="flex min-h-screen">
-      {/* Sidebar (fixed) */}
-      <aside className="z-40">
+    <div className="flex h-screen overflow-hidden">
+
+      {/* FIXED SIDEBAR */}
+      <aside className="fixed left-0 top-0 h-full z-30">
         <Sidebar />
       </aside>
 
-      {/* Main content area */}
-      <div className="flex-1 ml-64 min-h-screen flex flex-col">
-        {/* Top navbar */}
-        <header className="w-full">
+      {/* MAIN CONTENT WITH LEFT PADDING (SIDEBAR WIDTH) */}
+      <div className="flex flex-col flex-1 ml-64">
+
+        {/* TOP NAVIGATION FIXED */}
+        <header className="fixed top-0 left-64 right-0 z-20">
           <TopNavbar />
         </header>
 
-        {/* Page body */}
-        <main className="p-6 bg-gradient-to-br from-[#0a0f1f] to-[#081120] flex-1">
+        {/* PAGE CONTENT */}
+        <main className="pt-20 px-6 overflow-auto">
           {children}
         </main>
+
       </div>
     </div>
   );

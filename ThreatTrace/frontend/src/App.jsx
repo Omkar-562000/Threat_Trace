@@ -1,14 +1,17 @@
 // src/App.jsx
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 
+// Auth Pages
 import ForgotPassword from "./pages/ForgotPassword";
 import Login from "./pages/Login";
 import ResetPassword from "./pages/ResetPassword";
 import Signup from "./pages/Signup";
 
+// Dashboard Layout + Protection
 import DashboardLayout from "./layouts/DashboardLayout";
 import ProtectedRoute from "./utils/ProtectedRoute";
 
+// Dashboard Feature Pages
 import Alerts from "./pages/Alerts";
 import Audit from "./pages/Audit";
 import Dashboard from "./pages/Dashboard";
@@ -21,13 +24,13 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Auth */}
+        {/* ===== AUTH ROUTES ===== */}
         <Route path="/" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
 
-        {/* Dashboard area (protected) */}
+        {/* ===== PROTECTED DASHBOARD AREA ===== */}
         <Route
           path="/dashboard"
           element={
@@ -105,8 +108,15 @@ export default function App() {
           }
         />
 
-        {/* fallback route */}
-        <Route path="*" element={<div className="p-6 text-white">Page not found</div>} />
+        {/* ===== FALLBACK ===== */}
+        <Route
+          path="*"
+          element={
+            <div className="p-6 text-white text-center text-xl">
+              ❌ Page Not Found
+            </div>
+          }
+        />
       </Routes>
     </BrowserRouter>
   );
