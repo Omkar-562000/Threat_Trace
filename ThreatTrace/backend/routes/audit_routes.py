@@ -1,299 +1,314 @@
-# backend/routes/audit_routes.py
 from flask import Blueprint, request, jsonify, current_app, send_file
 import os
-import hashlib
-from datetime import datetime
-import difflib
 import io
 import csv
+from datetime import datetime
+from werkzeug.utils import secure_filename
 
+from utils.audit_service import verify_file_integrity
 from utils.email_alerts import send_tamper_email
 
 audit_bp = Blueprint("audit_bp", __name__)
 
-def calculate_file_hash(file_path):
-    try:
-        with open(file_path, "rb") as f:
-            return hashlib.sha256(f.read()).hexdigest()
-    except Exception:
-        return None
+# Allowed extensions & size limits
+ALLOWED_EXTENSIONS = {".log", ".txt"}
+MAX_FILE_SIZE_MB = 50
+MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
 
-# VERIFY via path (POST: log_path)
+
+# ------------------------
+# Helper
+# ------------------------
+def _is_allowed_file(filename: str) -> bool:
+    _, ext = os.path.splitext(filename or "")
+    return ext.lower() in ALLOWED_EXTENSIONS
+
+
+# ============================================================
+# 1. VERIFY BY SERVER FILE PATH
+# Supports both: /verify and /verify-path (keeps frontend compatibility)
+# POST payload: { "log_path": "<absolute-or-relative-path>" }
+# ============================================================
 @audit_bp.route("/verify", methods=["POST"])
-def verify_log():
+@audit_bp.route("/verify-path", methods=["POST"])
+def verify_path():
     try:
-        data = request.get_json()
-        log_path = data.get("log_path")
-        if not log_path or not os.path.exists(log_path):
-            return jsonify({"status":"error","message":"Log file not found"}), 404
+        data = request.get_json(force=True, silent=True) or {}
+        log_path = data.get("log_path") or data.get("path")  # tolerant keys
+
+        if not log_path:
+            return jsonify({"status": "error", "message": "log_path required"}), 400
+
+        # Ensure provided path exists
+        if not os.path.exists(log_path):
+            return jsonify({"status": "error", "message": "Log file not found"}), 404
 
         db = current_app.config["DB"]
-        coll = db["audit_logs"]
+        sio = current_app.config.get("SOCKETIO")
 
-        current_hash = calculate_file_hash(log_path)
-        if not current_hash:
-            return jsonify({"status":"error","message":"Unable to calculate hash"}), 500
+        report = verify_file_integrity(log_path, db, sio)
 
-        now = datetime.utcnow()
-        existing = coll.find_one({"file_path": log_path})
-
-        diff_lines = []
-        tampered = False
-
-        if not existing:
-            coll.insert_one({
-                "file_path": log_path,
-                "last_hash": current_hash,
-                "last_verified": now,
-                "tampered": False,
-                "history": []
-            })
-            status = "new"
-            message = "Log registered and verified first time."
-        else:
-            prev_hash = existing.get("last_hash")
-            if prev_hash == current_hash:
-                coll.update_one({"_id": existing["_id"]}, {"$set":{"last_verified": now, "tampered": False}})
-                status = "clean"
-                message = "No tampering detected."
-            else:
-                tampered = True
-                # attempt to compute a short diff (best-effort)
+        # send email (best-effort) — function may accept different signatures
+        if isinstance(report, dict) and report.get("tampered"):
+            try:
+                # attempt to call with expected args; tolerant to signature differences
+                send_tamper_email(
+                    report.get("file_path", log_path),
+                    report.get("last_hash", ""),
+                    report.get("generated_at", datetime.utcnow().isoformat() + "Z"),
+                )
+            except TypeError:
+                # older/newer signature mismatch — try minimal call
                 try:
-                    with open(existing["file_path"], "r", errors="ignore") as oldf:
-                        old_lines = oldf.readlines()
+                    send_tamper_email(report.get("file_path", log_path), report.get("last_hash", ""))
                 except Exception:
-                    old_lines = []
+                    pass
+            except Exception:
+                pass
 
-                try:
-                    with open(log_path, "r", errors="ignore") as newf:
-                        new_lines = newf.readlines()
-                except Exception:
-                    new_lines = []
+        return jsonify(report), 200
 
-                diff_lines = list(difflib.unified_diff(old_lines, new_lines, lineterm=""))
-                coll.update_one({"_id": existing["_id"]}, {"$set":{"last_verified": now, "tampered": True, "last_hash": current_hash},
-                                                           "$push":{"history": {"timestamp": now, "tampered": True}}})
-                status = "tampered"
-                message = "Log file has been modified!"
-
-                # emit socket and email
-                sio = current_app.config.get("SOCKETIO")
-                if sio:
-                    sio.emit("tamper_alert", {"file_path": log_path, "hash": current_hash, "timestamp": now.isoformat(), "tampered": True}, broadcast=True)
-                try:
-                    send_tamper_email(log_path, current_hash, now.isoformat())
-                except Exception as e:
-                    print("Email send error:", e)
-
-        response = {"status": status, "message": message, "hash": current_hash}
-        if diff_lines:
-            response["diff"] = diff_lines[:1000]  # cap size
-        return jsonify(response), 200
     except Exception as e:
-        print("verify_log error:", e)
-        return jsonify({"status":"error","message":str(e)}), 500
+        print("verify_path error:", e)
+        return jsonify({"status": "error", "message": str(e)}), 500
 
-# UPLOAD + SCAN
+
+# ============================================================
+# 2. UPLOAD & VERIFY LOG FILE
+# Supports both: /upload-scan and /upload-verify
+# Multipart form: file -> file
+# ============================================================
 @audit_bp.route("/upload-scan", methods=["POST"])
-def upload_and_verify():
+@audit_bp.route("/upload-verify", methods=["POST"])
+def upload_verify():
+    save_path = None
     try:
-        if 'file' not in request.files:
-            return jsonify({"status":"error","message":"No file uploaded"}), 400
-        file = request.files['file']
-        if file.filename == '':
-            return jsonify({"status":"error","message":"Empty filename"}), 400
+        if "file" not in request.files:
+            return jsonify({"status": "error", "message": "File missing"}), 400
 
+        file = request.files["file"]
+        filename = secure_filename(file.filename or "")
+
+        if not filename:
+            return jsonify({"status": "error", "message": "Invalid filename"}), 400
+
+        if not _is_allowed_file(filename):
+            return jsonify({
+                "status": "error",
+                "message": f"Invalid file type. Allowed: {', '.join(sorted(ALLOWED_EXTENSIONS))}"
+            }), 400
+
+        # Content-length may be None for some clients; check stream size after saving if needed
+        if file.content_length and file.content_length > MAX_FILE_SIZE_BYTES:
+            return jsonify({
+                "status": "error",
+                "message": f"Max allowed file size: {MAX_FILE_SIZE_MB} MB"
+            }), 400
+
+        # Save uploaded file to temporary uploads directory
         uploads_dir = os.path.join(os.path.dirname(__file__), "..", "uploads")
         os.makedirs(uploads_dir, exist_ok=True)
-        save_name = f"{datetime.utcnow().strftime('%Y%m%d%H%M%S')}_{file.filename}"
-        save_path = os.path.join(uploads_dir, save_name)
+
+        unique_name = datetime.utcnow().strftime("%Y%m%d_%H%M%S_") + filename
+        save_path = os.path.join(uploads_dir, unique_name)
         file.save(save_path)
 
-        current_hash = calculate_file_hash(save_path)
-        now = datetime.utcnow()
-
         db = current_app.config["DB"]
-        coll = db["audit_logs"]
-        existing = coll.find_one({"file_path": save_path})
+        sio = current_app.config.get("SOCKETIO")
 
-        tampered = False
-        diff_lines = []
+        report = verify_file_integrity(save_path, db, sio)
 
-        if not existing:
-            coll.insert_one({
-                "file_path": save_path,
-                "last_hash": current_hash,
-                "last_verified": now,
-                "tampered": False,
-                "history": []
-            })
-            status = "new"
-            message = "File uploaded and registered."
-        else:
-            prev_hash = existing.get("last_hash")
-            if prev_hash == current_hash:
-                coll.update_one({"_id": existing["_id"]}, {"$set":{"last_verified": now, "tampered": False}})
-                status = "clean"
-                message = "No tampering detected."
-            else:
-                tampered = True
-                try:
-                    with open(existing["file_path"], "r", errors="ignore") as oldf:
-                        old_lines = oldf.readlines()
-                except Exception:
-                    old_lines = []
-                try:
-                    with open(save_path, "r", errors="ignore") as newf:
-                        new_lines = newf.readlines()
-                except Exception:
-                    new_lines = []
-
-                diff_lines = list(difflib.unified_diff(old_lines, new_lines, lineterm=""))
-                coll.update_one({"_id": existing["_id"]}, {"$set":{"last_verified": now, "tampered": True, "last_hash": current_hash},
-                                                           "$push":{"history": {"timestamp": now, "tampered": True}}})
-                status = "tampered"
-                message = "Uploaded file differs from previous record."
-
-        # emit and email if tampered
-        if tampered:
-            sio = current_app.config.get("SOCKETIO")
-            if sio:
-                sio.emit("tamper_alert", {"file_path": save_path, "hash": current_hash, "timestamp": now.isoformat(), "tampered": True}, broadcast=True)
+        # send email (best-effort)
+        if isinstance(report, dict) and report.get("tampered"):
             try:
-                send_tamper_email(save_path, current_hash, now.isoformat())
-            except Exception as e:
-                print("Email send error:", e)
+                send_tamper_email(
+                    report.get("file_path", save_path),
+                    report.get("last_hash", ""),
+                    report.get("generated_at", datetime.utcnow().isoformat() + "Z"),
+                )
+            except TypeError:
+                try:
+                    send_tamper_email(report.get("file_path", save_path), report.get("last_hash", ""))
+                except Exception:
+                    pass
+            except Exception:
+                pass
 
-        # clean up uploaded file (optional)
-        try:
-            os.remove(save_path)
-        except Exception:
-            pass
+        return jsonify(report), 200
 
-        res = {"status":"success","result":{"path": save_path, "entropy": None, "suspicious": False, "reason":[]}, "message": message}
-        if diff_lines:
-            res["result"]["diff"] = diff_lines[:1000]
-        return jsonify(res), 200
     except Exception as e:
-        print("upload_and_verify error:", e)
-        return jsonify({"status":"error","message":str(e)}), 500
+        print("upload_verify error:", e)
+        return jsonify({"status": "error", "message": "Upload failed"}), 500
 
-# HISTORY
+    finally:
+        # Always attempt cleanup of saved uploaded file
+        if save_path and os.path.exists(save_path):
+            try:
+                os.remove(save_path)
+            except Exception:
+                pass
+
+
+# ============================================================
+# 3. GET AUDIT HISTORY (FULL)
+# ============================================================
 @audit_bp.route("/history", methods=["GET"])
 def history():
     try:
         db = current_app.config["DB"]
         coll = db["audit_logs"]
-        rows = []
-        for r in coll.find({}, {"_id":0, "history":0}):
-            rows.append(r)
-        return jsonify({"status":"success","history":rows}), 200
+
+        records = list(coll.find({}, {"_id": 0}).sort("last_verified", -1))
+
+        return jsonify({"status": "success", "history": records}), 200
+
     except Exception as e:
         print("history error:", e)
-        return jsonify({"status":"error","message":str(e)}), 500
+        return jsonify({"status": "error", "message": str(e)}), 500
 
-# REPORT for a file_path (gives detailed record)
+
+# ============================================================
+# 4. GET DETAILED REPORT FOR A FILE
+# Query param: file_path=<path>
+# ============================================================
 @audit_bp.route("/report", methods=["GET"])
-def report():
+def audit_report():
     try:
         file_path = request.args.get("file_path")
         if not file_path:
-            return jsonify({"status":"error","message":"file_path required"}), 400
-        db = current_app.config["DB"]
-        coll = db["audit_logs"]
-        rec = coll.find_one({"file_path": file_path}, {"_id":0})
-        if not rec:
-            return jsonify({"status":"error","message":"No record found"}), 404
-        # enrich rec with last few diff sample lines if possible
-        history = rec.get("history", [])
-        # try reading small diff sample (best-effort)
-        rec["history"] = history
-        return jsonify({"status":"success","report":rec}), 200
-    except Exception as e:
-        print("report error:", e)
-        return jsonify({"status":"error","message":str(e)}), 500
+            return jsonify({"status": "error", "message": "file_path required"}), 400
 
-# DOWNLOAD CSV
-@audit_bp.route("/download/csv", methods=["GET"])
-def download_csv():
+        db = current_app.config["DB"]
+        rec = db["audit_logs"].find_one({"file_path": file_path}, {"_id": 0})
+
+        if not rec:
+            return jsonify({"status": "error", "message": "Record not found"}), 404
+
+        return jsonify({"status": "success", "report": rec}), 200
+
+    except Exception as e:
+        print("audit_report error:", e)
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+# ============================================================
+# 5. EXPORT CSV
+# Query param: file_path=<path>
+# ============================================================
+@audit_bp.route("/export/csv", methods=["GET"])
+def export_csv():
     try:
         file_path = request.args.get("file_path")
         if not file_path:
-            return jsonify({"status":"error","message":"file_path required"}), 400
+            return jsonify({"status": "error", "message": "file_path required"}), 400
+
         db = current_app.config["DB"]
-        coll = db["audit_logs"]
-        rec = coll.find_one({"file_path": file_path}, {"_id":0})
+        rec = db["audit_logs"].find_one({"file_path": file_path}, {"_id": 0})
         if not rec:
-            return jsonify({"status":"error","message":"No record found"}), 404
+            return jsonify({"status": "error", "message": "Record not found"}), 404
 
         output = io.StringIO()
         writer = csv.writer(output)
-        writer.writerow(["file_path", "last_hash", "last_verified", "tampered"])
-        writer.writerow([rec.get("file_path"), rec.get("last_hash"), rec.get("last_verified"), rec.get("tampered")])
 
-        # history rows
+        writer.writerow(["FILE", rec.get("file_path")])
+        writer.writerow(["Last Verified", rec.get("last_verified")])
+        writer.writerow(["Last Hash", rec.get("last_hash")])
+        writer.writerow(["Tampered", rec.get("tampered")])
         writer.writerow([])
-        writer.writerow(["history_timestamp", "tampered"])
+
+        writer.writerow(["HISTORY"])
+        writer.writerow(["Timestamp", "Tampered", "Hash"])
         for h in rec.get("history", []):
-            writer.writerow([h.get("timestamp"), h.get("tampered")])
+            # handle multiple timestamp formats (iso or field name)
+            ts = h.get("timestamp_iso") or h.get("timestamp") or str(h.get("timestamp"))
+            writer.writerow([ts, h.get("tampered"), h.get("hash")])
 
         output.seek(0)
-        return send_file(io.BytesIO(output.getvalue().encode("utf-8")), mimetype="text/csv", as_attachment=True, download_name="audit_report.csv")
-    except Exception as e:
-        print("download csv error:", e)
-        return jsonify({"status":"error","message":str(e)}), 500
 
-# DOWNLOAD PDF (uses reportlab if available)
-@audit_bp.route("/download/pdf", methods=["GET"])
-def download_pdf():
+        return send_file(
+            io.BytesIO(output.getvalue().encode()),
+            mimetype="text/csv",
+            as_attachment=True,
+            download_name="audit_report.csv"
+        )
+    except Exception as e:
+        print("CSV export error:", e)
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+# ============================================================
+# 6. EXPORT PDF (Enterprise report using reportlab if available)
+# Query param: file_path=<path>
+# ============================================================
+@audit_bp.route("/export/pdf", methods=["GET"])
+def export_pdf():
     try:
         file_path = request.args.get("file_path")
         if not file_path:
-            return jsonify({"status":"error","message":"file_path required"}), 400
-        db = current_app.config["DB"]
-        coll = db["audit_logs"]
-        rec = coll.find_one({"file_path": file_path}, {"_id":0})
-        if not rec:
-            return jsonify({"status":"error","message":"No record found"}), 404
+            return jsonify({"status": "error", "message": "file_path required"}), 400
 
-        # Attempt to use reportlab to create a basic PDF
+        db = current_app.config["DB"]
+        rec = db["audit_logs"].find_one({"file_path": file_path}, {"_id": 0})
+        if not rec:
+            return jsonify({"status": "error", "message": "Record not found"}), 404
+
         try:
+            # prefer reportlab for nicer PDF
             from reportlab.lib.pagesizes import letter
             from reportlab.pdfgen import canvas
+
             buffer = io.BytesIO()
             c = canvas.Canvas(buffer, pagesize=letter)
-            c.setFont("Helvetica-Bold", 14)
-            c.drawString(40, 750, "ThreatTrace Audit Report")
+
+            c.setFont("Helvetica-Bold", 16)
+            c.drawString(40, 760, "ThreatTrace Enterprise Audit Report")
+
             c.setFont("Helvetica", 10)
-            c.drawString(40, 730, f"File: {rec.get('file_path')}")
-            c.drawString(40, 715, f"Last Verified: {rec.get('last_verified')}")
-            c.drawString(40, 700, f"Last Hash: {rec.get('last_hash')}")
-            c.drawString(40, 685, f"Tampered: {rec.get('tampered')}")
-            y = 660
-            c.drawString(40, y, "History:")
+            c.drawString(40, 740, f"File: {rec['file_path']}")
+            c.drawString(40, 725, f"Last Verified: {rec.get('last_verified')}")
+            c.drawString(40, 710, f"Tampered: {rec.get('tampered')}")
+
+            y = 680
+            c.drawString(40, y, "History (last 20 checks):")
             y -= 15
+
             for h in rec.get("history", [])[-20:]:
-                if y < 60:
+                if y < 40:
                     c.showPage()
-                    y = 750
-                c.drawString(48, y, f"- {h.get('timestamp')} — Tampered: {h.get('tampered')}")
+                    y = 760
+                ts = h.get("timestamp_iso") or h.get("timestamp") or str(h.get("timestamp"))
+                c.drawString(40, y, f"{ts}  —  Tampered: {h.get('tampered')}  (Hash: {h.get('hash')})")
                 y -= 12
-            c.showPage()
+
             c.save()
             buffer.seek(0)
-            return send_file(buffer, mimetype="application/pdf", as_attachment=True, download_name="audit_report.pdf")
-        except Exception:
-            # fallback: plain text rendered as bytes and declared PDF (basic)
-            text = f"ThreatTrace Audit Report\n\nFile: {rec.get('file_path')}\nLast Verified: {rec.get('last_verified')}\nLast Hash: {rec.get('last_hash')}\nTampered: {rec.get('tampered')}\n\nHistory:\n"
+            return send_file(
+                buffer,
+                mimetype="application/pdf",
+                as_attachment=True,
+                download_name="audit_report.pdf"
+            )
+        except ImportError:
+            # fallback: plain text rendered as bytes with PDF mimetype
+            text = f"ThreatTrace Audit Report\n\nFile: {rec.get('file_path')}\nLast Verified: {rec.get('last_verified')}\nTampered: {rec.get('tampered')}\n\nHistory:\n"
             for h in rec.get("history", []):
-                text += f"- {h.get('timestamp')} — Tampered: {h.get('tampered')}\n"
-            return send_file(io.BytesIO(text.encode("utf-8")), mimetype="application/pdf", as_attachment=True, download_name="audit_report.pdf")
-    except Exception as e:
-        print("download pdf error:", e)
-        return jsonify({"status":"error","message":str(e)}), 500
+                ts = h.get("timestamp_iso") or h.get("timestamp") or str(h.get("timestamp"))
+                text += f"- {ts} — Tampered: {h.get('tampered')} (Hash: {h.get('hash')})\n"
+            return send_file(
+                io.BytesIO(text.encode("utf-8")),
+                mimetype="application/pdf",
+                as_attachment=True,
+                download_name="audit_report.pdf"
+            )
 
-# Test endpoint
+    except Exception as e:
+        print("PDF export error:", e)
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+# ============================================================
+# 7. TEST ENDPOINT
+# ============================================================
 @audit_bp.route("/test", methods=["GET"])
 def test():
-    return jsonify({"message":"Audit module active"}), 200
+    return jsonify({"status": "success", "message": "Audit module active"}), 200

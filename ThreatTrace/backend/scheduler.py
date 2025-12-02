@@ -5,61 +5,29 @@ import traceback
 
 _scheduler = None
 
+from utils.audit_service import verify_file_integrity
+
 def run_periodic_checks(app):
     with app.app_context():
         try:
             db = app.config["DB"]
-            collection = db["audit_logs"]
-            socketio = app.config.get("SOCKETIO")
-
-            all_logs = list(collection.find({}))
-            for entry in all_logs:
-                path = entry.get("file_path")
-                if not path:
+            sio = app.config.get("SOCKETIO")
+            
+            # Find all registered files to check
+            all_entries = list(db["audit_logs"].find({}, {"file_path": 1}))
+            
+            for entry in all_entries:
+                file_path = entry.get("file_path")
+                if not file_path:
                     continue
-
-                from routes.audit_routes import calculate_file_hash
-                current_hash = calculate_file_hash(path)
-                now = datetime.utcnow()
-
-                if current_hash is None:
-                    collection.update_one({"_id": entry["_id"]}, {"$set": {"last_checked": now, "file_missing": True}})
-                    continue
-
-                prev_hash = entry.get("last_hash")
-                tampered = (prev_hash is not None and prev_hash != current_hash)
-
-                collection.update_one(
-                    {"_id": entry["_id"]},
-                    {"$set": {
-                        "last_hash": current_hash,
-                        "last_verified": now,
-                        "tampered": tampered,
-                        "file_missing": False
-                    },
-                     "$push": {
-                         "history": {
-                             "timestamp": now,
-                             "last_hash": current_hash,
-                             "tampered": tampered
-                         }
-                     }
-                    }
-                )
-
-                if tampered and socketio:
-                    socketio.emit("tamper_alert", {
-                        "file_path": path,
-                        "last_hash": current_hash,
-                        "timestamp": now.isoformat(),
-                        "message": "Tamper detected"
-                    }, broadcast=True)
-
-                    try:
-                        from utils.email_alerts import send_tamper_email
-                        send_tamper_email(path, current_hash, now.isoformat())
-                    except Exception as e:
-                        print("Email alert error in scheduler:", e)
+                
+                print(f"Scheduler: Verifying {file_path}")
+                try:
+                    # Use the centralized service
+                    verify_file_integrity(file_path, db, sio)
+                except Exception as e:
+                    print(f"Error verifying {file_path} in scheduler: {e}")
+                    traceback.print_exc()
 
         except Exception as e:
             print("Scheduler run error:", e)

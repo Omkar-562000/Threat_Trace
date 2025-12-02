@@ -12,14 +12,15 @@ bcrypt = Bcrypt()
 
 mail = None   # Will be initialized from app.py
 
-
+socketio = None  # Placeholder if socketio integration is needed later
 # ------------------------------------------------------------
 # INITIALIZE MAIL (called from app.py)
 # ------------------------------------------------------------
 def init_mail(app):
-    global mail
+    global mail , socketio
     from flask_mail import Mail
     mail = Mail(app)
+    socketio = app.extensions.get("socketio")
 
 
 # ------------------------------------------------------------

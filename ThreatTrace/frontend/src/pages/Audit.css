@@ -1,0 +1,19 @@
+/* src/pages/Audit.css */
+.diff-pre {
+  max-height: 300px;
+  overflow: auto;
+  background: #0b1020;
+  padding: 12px;
+}
+
+.diff-line-add {
+  color: #6ee7b7;
+}
+
+.diff-line-del {
+  color: #fb7185;
+}
+
+.diff-line-meta {
+  color: #60a5fa;
+}

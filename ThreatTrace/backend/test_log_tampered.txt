@@ -1,0 +1,3 @@
+This is a tampered test log file.
+It contains some different text.
+And some more text.

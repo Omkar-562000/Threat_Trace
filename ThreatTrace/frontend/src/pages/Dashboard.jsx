@@ -1,215 +1,263 @@
+// frontend/src/pages/Dashboard.jsx
+
 import axios from "axios";
 import { useEffect, useState } from "react";
+import Toast from "../components/ui/Toast";
+import socket from "../utils/socket";
 
 export default function Dashboard() {
+  const API_ROOT = import.meta.env.VITE_API_BASE || "http://127.0.0.1:5000";
+  const API = `${API_ROOT}/api`;
 
-    const [logs, setLogs] = useState([]);
-    const [selectedFile, setSelectedFile] = useState(null);
-    const [scanResult, setScanResult] = useState(null);
+  const [toast, setToast] = useState(null);
 
-    // Audit states
-    const [auditPath, setAuditPath] = useState("");
-    const [auditResult, setAuditResult] = useState(null);
+  const [logs, setLogs] = useState([]);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [scanResult, setScanResult] = useState(null);
 
-    // Fetch Logs Initially
-    useEffect(() => {
-        fetchRansomwareLogs();
-    }, []);
+  const [auditPath, setAuditPath] = useState("");
+  const [auditResult, setAuditResult] = useState(null);
 
-    const fetchRansomwareLogs = async () => {
-        try {
-            const res = await axios.get("http://127.0.0.1:5000/api/ransomware/logs");
-            setLogs(res.data.logs);
-        } catch (error) {
-            console.error("Error fetching logs:", error);
-        }
+  const [loadingScan, setLoadingScan] = useState(false);
+  const [loadingAudit, setLoadingAudit] = useState(false);
+
+  /* ======================================================
+     SOCKET.IO — REAL-TIME ALERT LISTENERS
+  ====================================================== */
+  useEffect(() => {
+    const onAlert = (msg) => {
+      const message = msg?.message || "Security Alert ⚠️";
+      setToast({
+        message,
+        severity: msg?.severity || "warning",
+      });
+
+      setTimeout(() => setToast(null), 3500);
     };
 
-    // FILE UPLOAD
-    const handleFileSelect = (e) => {
-        setSelectedFile(e.target.files[0]);
+    socket.on("new_alert", onAlert);
+    socket.on("tamper_alert", onAlert);
+    socket.on("ransomware_alert", onAlert);
+
+    return () => {
+      socket.off("new_alert", onAlert);
+      socket.off("tamper_alert", onAlert);
+      socket.off("ransomware_alert", onAlert);
     };
+  }, []);
 
-    const uploadAndScan = async () => {
-        if (!selectedFile) {
-            alert("Please select a file first.");
-            return;
-        }
+  /* ======================================================
+     FETCH RANSOMWARE LOGS
+  ====================================================== */
+  useEffect(() => {
+    fetchLogs();
+  }, []);
 
-        const formData = new FormData();
-        formData.append("file", selectedFile);
+  const fetchLogs = async () => {
+    try {
+      const res = await axios.get(`${API}/ransomware/logs`);
+      if (res.data.status === "success") {
+        setLogs(res.data.logs);
+      }
+    } catch (err) {
+      console.error("Logs fetch error:", err);
+    }
+  };
 
-        try {
-            const res = await axios.post(
-                "http://127.0.0.1:5000/api/ransomware/upload-scan",
-                formData,
-                { headers: { "Content-Type": "multipart/form-data" } }
-            );
+  /* ======================================================
+     FILE UPLOAD → RANSOMWARE SCAN
+  ====================================================== */
+  const handleFileSelect = (e) => {
+    setSelectedFile(e.target.files[0]);
+  };
 
-            setScanResult(res.data.result);
-            fetchRansomwareLogs();
-        } catch (error) {
-            console.error("Upload scan error:", error);
-        }
-    };
+  const uploadAndScan = async () => {
+    if (!selectedFile) return alert("Please select a file first.");
 
-    // AUDIT LOG CHECKING
-    const verifyAuditLog = async () => {
-        if (!auditPath) {
-            alert("Enter a valid file path.");
-            return;
-        }
+    setLoadingScan(true);
+    const form = new FormData();
+    form.append("file", selectedFile);
 
-        try {
-            const res = await axios.post(
-                "http://127.0.0.1:5000/api/audit/verify",
-                { log_path: auditPath }
-            );
+    try {
+      const res = await axios.post(`${API}/ransomware/upload`, form, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
 
-            setAuditResult(res.data);
-        } catch (err) {
-            console.error("Audit error:", err);
-            alert("Error verifying log file.");
-        }
-    };
+      if (res.data.status === "success") {
+        setScanResult(res.data.result);
+        fetchLogs();
+      } else {
+        alert(res.data.message);
+      }
+    } catch (err) {
+      console.error("Upload scan error:", err);
+    }
 
+    setLoadingScan(false);
+  };
 
-    return (
-        <div className="min-h-screen bg-cyberDark text-white p-6 relative">
+  /* ======================================================
+     AUDIT LOG VERIFY BY SERVER PATH
+  ====================================================== */
+  const verifyAuditLog = async () => {
+    if (!auditPath) return alert("Enter a file path to verify.");
 
-            {/* Background Glow Effects */}
-            <div className="absolute w-96 h-96 bg-cyberPurple/20 blur-3xl rounded-full top-20 left-10"></div>
-            <div className="absolute w-80 h-80 bg-cyberNeon/20 blur-3xl rounded-full bottom-10 right-10"></div>
+    setLoadingAudit(true);
 
+    try {
+      const res = await axios.post(`${API}/audit/verify-path`, {
+        log_path: auditPath,
+      });
 
-            <h1 className="text-4xl font-Orbitron font-bold mb-10 text-center text-cyberPurple tracking-widest">
-                ThreatTrace Dashboard
-            </h1>
+      if (res.data.status !== "error") {
+        setAuditResult(res.data);
+      } else {
+        alert(res.data.message);
+      }
+    } catch (err) {
+      console.error("Audit verify error:", err);
+      alert("Failed to verify audit log.");
+    }
 
-            {/* GRID: Three Sections */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+    setLoadingAudit(false);
+  };
 
-                {/* ====== UPLOAD + SCAN SECTION ====== */}
-                <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl p-6 shadow-xl 
-                                hover:border-cyberNeon/40 hover:shadow-cyberNeon/20 transition">
-                    <h2 className="text-2xl font-semibold mb-4 text-cyberNeon">
-                        🔍 Upload File for Ransomware Scan
-                    </h2>
+  return (
+    <div className="min-h-screen bg-cyberDark text-white p-6 relative">
 
-                    <input
-                        type="file"
-                        onChange={handleFileSelect}
-                        className="bg-white/10 border border-white/20 p-3 rounded-lg w-full mb-4"
-                    />
+      {/* Toast */}
+      {toast && (
+        <Toast
+          message={toast.message}
+          severity={toast.severity}
+          onClose={() => setToast(null)}
+        />
+      )}
 
-                    <button
-                        onClick={uploadAndScan}
-                        className="px-4 py-3 w-full rounded-lg bg-cyberPurple hover:bg-cyberNeon font-bold
-                                   shadow-lg shadow-cyberPurple/40 transition"
-                    >
-                        Upload & Scan
-                    </button>
+      {/* Background FX */}
+      <div className="absolute w-96 h-96 bg-cyberPurple/20 blur-3xl rounded-full top-20 left-10"></div>
+      <div className="absolute w-80 h-80 bg-cyberNeon/20 blur-3xl rounded-full bottom-10 right-10"></div>
 
-                    {scanResult && (
-                        <div className="mt-4 p-4 bg-white/10 border border-white/20 rounded-lg text-sm">
-                            <h3 className="font-bold text-cyberNeon">Scan Result</h3>
-                            <p><strong>File:</strong> {scanResult.path}</p>
-                            <p><strong>Entropy:</strong> {scanResult.entropy}</p>
-                            <p><strong>Suspicious:</strong> {scanResult.suspicious ? "YES" : "NO"}</p>
+      {/* Page Title */}
+      <h1 className="text-4xl font-Orbitron font-bold mb-10 text-center text-cyberPurple tracking-widest">
+        ThreatTrace Dashboard
+      </h1>
 
-                            <p><strong>Reason:</strong> 
-                                {scanResult.reason.length ? scanResult.reason.join(", ") : "None"}
-                            </p>
-                        </div>
-                    )}
-                </div>
+      {/* GRID SECTION */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
 
+        {/* --------------------------------------------------
+            RANSOMWARE SCAN BOX
+        -------------------------------------------------- */}
+        <div className="glass-cyber p-6 border border-white/20 rounded-2xl shadow-xl">
+          <h2 className="text-2xl font-semibold text-cyberNeon mb-4">
+            🔍 Upload File for Ransomware Scan
+          </h2>
 
-                {/* ====== AUDIT LOG INTEGRITY SECTION ====== */}
-                <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl p-6 shadow-xl 
-                                hover:border-cyberPurple/40 hover:shadow-cyberPurple/20 transition">
-                    <h2 className="text-2xl font-semibold mb-4 text-cyberNeon">
-                        📝 Audit Log Integrity Checker
-                    </h2>
+          <input
+            type="file"
+            onChange={handleFileSelect}
+            className="cyber-input mb-4"
+          />
 
-                    <input
-                        type="text"
-                        placeholder="Enter log file path (E:/ThreatTrace/system.log)"
-                        value={auditPath}
-                        onChange={(e) => setAuditPath(e.target.value)}
-                        className="w-full p-3 rounded-lg bg-white/10 border border-white/20 placeholder-gray-300 mb-4"
-                    />
+          <button
+            className="cyber-btn w-full"
+            onClick={uploadAndScan}
+            disabled={loadingScan}
+          >
+            {loadingScan ? "Scanning..." : "Upload & Scan"}
+          </button>
 
-                    <button
-                        onClick={verifyAuditLog}
-                        className="px-4 py-3 w-full rounded-lg bg-cyberPurple hover:bg-cyberNeon font-bold
-                                   shadow-lg shadow-cyberPurple/40 transition"
-                    >
-                        Verify Integrity
-                    </button>
-
-                    {auditResult && (
-                        <div className="mt-4 p-4 bg-white/10 border border-white/20 rounded-lg text-sm">
-                            <h3 className="font-bold mb-2 text-cyberNeon">Audit Result</h3>
-
-                            <p><strong>Status:</strong> 
-                                {auditResult.status === "clean" && <span className="text-green-400"> Clean</span>}
-                                {auditResult.status === "tampered" && <span className="text-red-400"> ⚠ Tampered</span>}
-                                {auditResult.status === "new" && <span className="text-blue-400"> First Time Registered</span>}
-                            </p>
-
-                            <p><strong>Message:</strong> {auditResult.message}</p>
-                            <p><strong>Hash:</strong> {auditResult.hash}</p>
-                        </div>
-                    )}
-                </div>
+          {scanResult && (
+            <div className="mt-4 p-4 bg-white/10 rounded-xl border border-white/20 text-sm">
+              <h3 className="font-bold text-cyberNeon">Scan Result</h3>
+              <p><strong>File:</strong> {scanResult.path}</p>
+              <p><strong>Entropy:</strong> {scanResult.entropy}</p>
+              <p><strong>Suspicious:</strong> {scanResult.suspicious ? "YES" : "NO"}</p>
+              <p><strong>Reason:</strong> {scanResult.reason?.join(", ") || "None"}</p>
             </div>
-
-
-            {/* ====== RANSOMWARE TABLE SECTION (FULL WIDTH) ====== */}
-            <div className="mt-10 bg-white/10 backdrop-blur-xl border border-white/20 p-6 rounded-2xl shadow-xl">
-                <h2 className="text-2xl font-semibold mb-4 text-cyberNeon">
-                    🛡️ Ransomware Scan Logs
-                </h2>
-
-                <table className="w-full text-left border-collapse">
-                    <thead>
-                        <tr className="bg-white/10 border border-white/20">
-                            <th className="p-3">File Path</th>
-                            <th className="p-3">Entropy</th>
-                            <th className="p-3">Status</th>
-                            <th className="p-3">Reason</th>
-                            <th className="p-3">Timestamp</th>
-                        </tr>
-                    </thead>
-
-                    <tbody>
-                        {logs.map((log, idx) => (
-                            <tr key={idx} className="border-b border-white/10 hover:bg-white/5 transition">
-                                <td className="p-3">{log.path}</td>
-                                <td className="p-3">{log.entropy?.toFixed(2)}</td>
-                                <td className="p-3">
-                                    {log.suspicious ? (
-                                        <span className="text-red-400 font-bold">Suspicious</span>
-                                    ) : (
-                                        <span className="text-green-400 font-bold">Clean</span>
-                                    )}
-                                </td>
-                                <td className="p-3">
-                                    {log.reason?.length > 0 ? log.reason.join(", ") : "None"}
-                                </td>
-                                <td className="p-3">
-                                    {new Date(log.scan_time).toLocaleString()}
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-
-                {logs.length === 0 && (
-                    <p className="text-gray-400 mt-4">No scans recorded yet.</p>
-                )}
-            </div>
+          )}
         </div>
-    );
+
+        {/* --------------------------------------------------
+            AUDIT INTEGRITY CHECKER
+        -------------------------------------------------- */}
+        <div className="glass-cyber p-6 border border-white/20 rounded-2xl shadow-xl">
+          <h2 className="text-2xl font-semibold text-cyberNeon mb-4">
+            📝 Audit Log Integrity Checker
+          </h2>
+
+          <input
+            type="text"
+            placeholder="Enter log file path (C:/logs/system.log)"
+            value={auditPath}
+            onChange={(e) => setAuditPath(e.target.value)}
+            className="cyber-input mb-4"
+          />
+
+          <button
+            className="cyber-btn w-full"
+            onClick={verifyAuditLog}
+            disabled={loadingAudit}
+          >
+            {loadingAudit ? "Verifying..." : "Verify Integrity"}
+          </button>
+
+          {auditResult && (
+            <div className="mt-4 p-4 bg-white/10 rounded-xl border border-white/20 text-sm">
+              <h3 className="font-bold text-cyberNeon mb-2">Audit Result</h3>
+
+              <p><strong>Status:</strong> {auditResult.status}</p>
+              <p><strong>Message:</strong> {auditResult.message}</p>
+              <p><strong>Hash:</strong> {auditResult.last_hash || auditResult.hash}</p>
+            </div>
+          )}
+        </div>
+
+      </div>
+
+      {/* --------------------------------------------------
+          RANSOMWARE LOGS TABLE
+      -------------------------------------------------- */}
+      <div className="glass-cyber p-6 mt-10 border border-white/20 rounded-2xl shadow-xl">
+        <h2 className="text-2xl font-semibold text-cyberNeon mb-4">
+          🛡️ Ransomware Scan Logs
+        </h2>
+
+        <table className="cyber-table w-full text-left">
+          <thead>
+            <tr className="bg-white/10 border border-white/20">
+              <th className="p-3">File Path</th>
+              <th className="p-3">Entropy</th>
+              <th className="p-3">Status</th>
+              <th className="p-3">Reason</th>
+              <th className="p-3">Timestamp</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {logs.map((log, idx) => (
+              <tr key={idx} className="border-b border-white/10 hover:bg-white/5 transition">
+                <td className="p-3">{log.path}</td>
+                <td className="p-3">{log.entropy}</td>
+                <td className="p-3">
+                  {log.suspicious ? (
+                    <span className="text-red-400 font-bold">Suspicious</span>
+                  ) : (
+                    <span className="text-green-400 font-bold">Clean</span>
+                  )}
+                </td>
+                <td className="p-3">{log.reason?.join(", ") || "None"}</td>
+                <td className="p-3">{new Date(log.scan_time).toLocaleString()}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+
+        {logs.length === 0 && (
+          <p className="text-gray-400 mt-4">No logs found.</p>
+        )}
+      </div>
+    </div>
+  );
 }

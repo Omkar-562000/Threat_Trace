@@ -2,9 +2,9 @@
 from flask import Blueprint, jsonify, current_app, request
 from scheduler import init_scheduler, stop_scheduler, run_now, scheduler_status
 
-sched_bp = Blueprint("sched_bp", __name__)
+scheduler_bp = Blueprint("scheduler_bp", __name__)
 
-@sched_bp.route("/start", methods=["POST"])
+@scheduler_bp.route("/start", methods=["POST"])
 def start_scheduler():
     try:
         data = request.get_json() or {}
@@ -15,7 +15,7 @@ def start_scheduler():
         print("start scheduler error:", e)
         return jsonify({"status":"error","message":str(e)}), 500
 
-@sched_bp.route("/stop", methods=["POST"])
+@scheduler_bp.route("/stop", methods=["POST"])
 def stop():
     try:
         ok = stop_scheduler(current_app)
@@ -26,7 +26,7 @@ def stop():
         print("stop scheduler error:", e)
         return jsonify({"status":"error","message":str(e)}), 500
 
-@sched_bp.route("/run-now", methods=["POST"])
+@scheduler_bp.route("/run-now", methods=["POST"])
 def trigger_now():
     try:
         ok = run_now(current_app)
@@ -37,7 +37,7 @@ def trigger_now():
         print("run now error:", e)
         return jsonify({"status":"error","message":str(e)}), 500
 
-@sched_bp.route("/status", methods=["GET"])
+@scheduler_bp.route("/status", methods=["GET"])
 def status():
     try:
         s = scheduler_status(current_app)

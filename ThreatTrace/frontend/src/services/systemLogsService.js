@@ -1,38 +1,103 @@
-// src/services/systemLogsService.js
+// frontend/src/services/systemLogsService.js
+// Clean API service matching backend/routes/logs_routes.py
+
 import axios from "axios";
 
-const API_BASE = process.env.REACT_APP_API_BASE || "http://127.0.0.1:5000/api/logs";
+// ----------------------------------------------------------
+// Base API URL
+// ----------------------------------------------------------
+const API_ROOT = import.meta.env.VITE_API_BASE || "http://127.0.0.1:5000";
+const LOGS_API = `${API_ROOT}/api/logs`;
 
-export async function getSystemLogs({ q = "", page = 1, per_page = 100 } = {}) {
-  const params = { q, page, per_page };
-  const res = await axios.get(`${API_BASE}/`, { params });
+
+// ----------------------------------------------------------
+// 1) Fetch Logs (supports: q, level, source, date range, pagination)
+// ----------------------------------------------------------
+export async function getSystemLogs({
+  q = "",
+  level = "ALL",
+  source = "",
+  dateFrom = "",
+  dateTo = "",
+  page = 1,
+  per_page = 100
+} = {}) {
+
+  const params = {
+    q,
+    level,
+    source,
+    date_from: dateFrom || undefined,
+    date_to: dateTo || undefined,
+    page,
+    per_page
+  };
+
+  const res = await axios.get(`${LOGS_API}/`, { params });
   return res.data;
 }
 
-export async function ingestLog(entry) {
-  // entry: { message, level, source, timestamp? }
-  const res = await axios.post(`${API_BASE}/ingest`, entry);
-  return res.data;
+
+// ----------------------------------------------------------
+// 2) Fetch dynamic log levels (INFO, WARNING, ERROR, CRITICAL)
+// ----------------------------------------------------------
+export async function getLogLevels() {
+  try {
+    const res = await axios.get(`${LOGS_API}/levels`);
+    return res.data; // {status:'success', levels:[...] }
+  } catch {
+    return {
+      status: "error",
+      levels: ["INFO", "WARNING", "ERROR", "CRITICAL"]
+    };
+  }
 }
 
-export async function exportLogs(format = "csv", q = "") {
-  const url = `${API_BASE}/export?format=${format}${q ? `&q=${encodeURIComponent(q)}` : ""}`;
-  // For file download we use window.open for now, or fetch blob:
-  const res = await axios.get(url, { responseType: "blob" });
-  return res;
+
+// ----------------------------------------------------------
+// 3) Export logs (CSV or PDF)
+// ----------------------------------------------------------
+export async function exportLogs(format = "csv", filters = {}) {
+  const params = new URLSearchParams({
+    format,
+    ...filters
+  }).toString();
+
+  const url = `${LOGS_API}/export?${params}`;
+
+  return axios.get(url, { responseType: "blob" });
 }
 
-// Helper that triggers download of a blob
-export async function downloadExport(format = "csv", q = "") {
-  const res = await exportLogs(format, q);
-  const blob = new Blob([res.data], { type: res.headers["content-type"] });
+
+// ----------------------------------------------------------
+// 4) Trigger download
+// ----------------------------------------------------------
+export async function downloadExport(format = "csv", filters = {}) {
+  const response = await exportLogs(format, filters);
+
+  const blob = new Blob([response.data], {
+    type: response.headers["content-type"]
+  });
+
   const url = window.URL.createObjectURL(blob);
   const a = document.createElement("a");
-  const ext = format === "csv" ? "csv" : "pdf";
+
   a.href = url;
-  a.download = `system_logs_export.${ext}`;
+  a.download = `system_logs_export.${format}`;
   document.body.appendChild(a);
   a.click();
   a.remove();
+
   window.URL.revokeObjectURL(url);
 }
+
+
+// ----------------------------------------------------------
+// Default export
+// ----------------------------------------------------------
+export default {
+  getSystemLogs,
+  getLogLevels,
+  exportLogs,
+  downloadExport
+};

@@ -1,40 +1,157 @@
-# backend/utils/email_alerts.py
+"""
+=================================================================
+   ThreatTrace — Email Alerting System (Flask-Mail)
+=================================================================
+
+Provides two alert email channels:
+
+1️⃣ send_tamper_email()
+    → Used by audit_service when file-integrity changes
+
+2️⃣ send_security_email()
+    → Used by unified alert_manager for high/critical alerts
+
+Both functions:
+    ✓ Support HTML + plain text fallback
+    ✓ Auto-detect mail instance
+    ✓ Auto-detect admin recipient
+"""
+
 from flask_mail import Message
 from flask import current_app
 
-def send_tamper_email(file_path, hash_value, timestamp):
-    try:
-        # Flask-Mail instance
-        mail = current_app.extensions.get("mail")
-        if not mail:
-            print("❌ Mail instance missing")
-            return
 
-        admin_email = current_app.config.get("MAIL_USERNAME")
-        recipients = [admin_email] if admin_email else []
+# -------------------------------------------------------------
+# INTERNAL HELPERS
+# -------------------------------------------------------------
+def _get_mail_instance():
+    """Safely return Flask-Mail instance or None."""
+    mail = current_app.extensions.get("mail")
+    if not mail:
+        print("❌ Flask-Mail not initialized — email alerts disabled")
+        return None
+    return mail
 
-        msg = Message(
-            subject="🚨 ThreatTrace Tamper Alert Detected!",
-            sender=admin_email,
-            recipients=recipients,
-        )
 
-        msg.body = f"""
-A log tampering event has been detected by ThreatTrace.
+def _get_recipients():
+    """Get admin email(s). Must exist in config MAIL_USERNAME."""
+    admin = current_app.config.get("MAIL_USERNAME")
+    if not admin:
+        print("⚠ No MAIL_USERNAME configured — cannot send email alerts")
+        return []
+    return [admin]
 
-File Path  : {file_path}
-SHA256 Hash: {hash_value}
-Timestamp  : {timestamp}
 
-Recommended Actions:
-- Review the Audit Report in your ThreatTrace dashboard
-- Check server processes and user activity
-- Investigate potential unauthorized access
+# -------------------------------------------------------------
+# 1️⃣ SEND TAMPER ALERT EMAIL
+# -------------------------------------------------------------
+def send_tamper_email(file_path, hash_value, timestamp, severity="HIGH"):
+    """
+    Triggered when audit_service detects file tampering.
+    """
+    mail = _get_mail_instance()
+    recipients = _get_recipients()
+    if not mail or not recipients:
+        return
 
-ThreatTrace — Automated Security Monitoring System
+    sender = current_app.config.get("MAIL_USERNAME")
+
+    subject = f"🚨 ThreatTrace TAMPER ALERT — {severity}"
+
+    msg = Message(subject=subject, sender=sender, recipients=recipients)
+
+    # Plain text
+    msg.body = f"""
+A tampering event was detected.
+
+File Path : {file_path}
+SHA256    : {hash_value}
+Timestamp : {timestamp}
+Severity  : {severity}
+
+Recommended:
+• Review audit logs
+• Verify system user actions
+• Check server integrity
+• Investigate for ransomware traces
+
+— ThreatTrace Security Engine
 """
 
+    # HTML version
+    msg.html = f"""
+<h2 style="color:#ff4444;">🚨 ThreatTrace — Tampering Alert</h2>
+
+<p>A monitored system file has changed unexpectedly.</p>
+
+<ul>
+  <li><strong>File Path:</strong> {file_path}</li>
+  <li><strong>SHA256 Hash:</strong> {hash_value}</li>
+  <li><strong>Timestamp:</strong> {timestamp}</li>
+  <li><strong>Severity:</strong> {severity}</li>
+</ul>
+
+<h3>Recommended Actions:</h3>
+<ul>
+  <li>Check ThreatTrace audit logs</li>
+  <li>Investigate administrator or process activity</li>
+  <li>Check for encryption (possible ransomware)</li>
+</ul>
+
+<p style="color:gray;">ThreatTrace — Automated Security Monitoring System</p>
+"""
+
+    try:
         mail.send(msg)
-        print(f"📧 Email alert sent for: {file_path}")
+        print(f"📧 Tamper alert email sent → {file_path}")
     except Exception as e:
-        print("❌ Email alert send error:", e)
+        print(f"❌ Failed to send tamper alert email: {e}")
+
+
+# -------------------------------------------------------------
+# 2️⃣ SEND SECURITY EMAIL (Used by send_alert)
+# -------------------------------------------------------------
+def send_security_email(title, message):
+    """
+    Used for high/critical alerts from unified alert manager.
+    """
+    mail = _get_mail_instance()
+    recipients = _get_recipients()
+    if not mail or not recipients:
+        return
+
+    sender = current_app.config.get("MAIL_USERNAME")
+
+    msg = Message(
+        subject=f"🔴 Security Alert — {title}",
+        sender=sender,
+        recipients=recipients,
+    )
+
+    msg.body = f"""
+A high-severity alert has been raised.
+
+Title   : {title}
+Message : {message}
+
+Time    : {current_app.config.get("TIMEZONE", "UTC")}
+
+— ThreatTrace Security Engine
+"""
+
+    msg.html = f"""
+<h2 style="color:#d9534f;">🔴 ThreatTrace — High Severity Alert</h2>
+
+<p><strong>{title}</strong></p>
+<p>{message}</p>
+
+<p style="margin-top:20px;color:gray;">
+This message was automatically generated by the ThreatTrace Security Engine.
+</p>
+"""
+
+    try:
+        mail.send(msg)
+        print(f"📧 Security email sent → {title}")
+    except Exception as e:
+        print(f"❌ Failed to send security alert email: {e}")
