@@ -8,35 +8,35 @@ from typing import List, Optional, Dict, Any
 
 from utils.email_alerts import send_tamper_email
 
-# Lock to prevent race-condition when scanning same file path
+# Prevent race-condition for same file path scan
 file_lock = threading.Lock()
 
-# Tunable constants
+# Limits
 MAX_SNAPSHOT_LINES = 2000
 MAX_DIFF_LINES = 200
-HASH_READ_CHUNK = 4 * 1024 * 1024  # 4MB streaming reads
+HASH_READ_CHUNK = 4 * 1024 * 1024  # 4MB
 
 
-# ------------------------------------------------------------
-#  SHA256 STREAMING HASH
-# ------------------------------------------------------------
+# ============================================================
+# SHA256 STREAMING HASH
+# ============================================================
 def _streaming_sha256(file_path: str) -> Optional[str]:
     try:
         h = hashlib.sha256()
         with open(file_path, "rb") as fh:
             while True:
-                data = fh.read(HASH_READ_CHUNK)
-                if not data:
+                chunk = fh.read(HASH_READ_CHUNK)
+                if not chunk:
                     break
-                h.update(data)
+                h.update(chunk)
         return h.hexdigest()
     except Exception:
         return None
 
 
-# ------------------------------------------------------------
-#  READ FILE LINES (SAFE)
-# ------------------------------------------------------------
+# ============================================================
+# SAFE READ FILE LINES
+# ============================================================
 def read_file_lines(path: str, max_lines: Optional[int] = None) -> List[str]:
     lines = []
     p = Path(path)
@@ -48,34 +48,33 @@ def read_file_lines(path: str, max_lines: Optional[int] = None) -> List[str]:
     return lines
 
 
-# ------------------------------------------------------------
-#  REPORT ID GENERATOR
-# ------------------------------------------------------------
+# ============================================================
+# REPORT ID GENERATOR
+# ============================================================
 def make_report_id() -> str:
     ts = datetime.utcnow().strftime("%Y%m%d%H%M%S")
     short = uuid.uuid4().hex[:8]
     return f"TT-AUDIT-{ts}-{short}"
 
 
-# ------------------------------------------------------------
-#  UNIFIED DIFF GENERATOR
-# ------------------------------------------------------------
+# ============================================================
+# UNIFIED DIFF (TRIMMED)
+# ============================================================
 def compute_diff(prev: List[str], new: List[str], limit=MAX_DIFF_LINES) -> List[str]:
     diff = list(difflib.unified_diff(prev, new, lineterm=""))
     if len(diff) > limit:
-        return diff[:limit] + ["... (truncated)"]
+        return diff[:limit] + ["...(diff truncated)"]
     return diff
 
 
-# ------------------------------------------------------------
-#  RISK SCORING ALGORITHM
-# ------------------------------------------------------------
+# ============================================================
+# RISK SCORE
+# ============================================================
 def risk_score_from_digest(tampered: bool, added: int, removed: int, size: int):
     score = 0
 
     if tampered:
         score += 50
-
     score += min(30, (added + removed) // 5)
     score += min(20, size // (1024 * 1024 * 10))
 
@@ -88,38 +87,38 @@ def risk_score_from_digest(tampered: bool, added: int, removed: int, size: int):
     return "LOW", score
 
 
-# ------------------------------------------------------------
-#  RECOMMENDATIONS ENGINE
-# ------------------------------------------------------------
+# ============================================================
+# RECOMMENDATIONS ENGINE
+# ============================================================
 def generate_recommendations(status: str, risk: str):
-    recs = []
+    rec = []
 
     if status == "new":
-        recs.append("File registered for first time — baseline snapshot stored.")
+        rec.append("Baseline snapshot recorded on first scan.")
 
     if status == "tampered":
-        recs.append("Investigate related system audit logs immediately.")
-        recs.append("Check user/process activity around change timestamp.")
-        recs.append("Review system logs for unauthorized access or malware.")
+        rec.append("Inspect system for unauthorized modifications.")
+        rec.append("Review system logs near modification timestamp.")
+        rec.append("Check entropy spikes indicating possible ransomware.")
 
-    if risk in ("CRITICAL", "HIGH"):
-        recs.append("Perform a full forensic backup before further system modifications.")
+    if risk in ("HIGH", "CRITICAL"):
+        rec.append("Create a full forensic backup immediately.")
 
-    recs.append("Maintain immutable backups of audit logs.")
-    return recs
+    rec.append("Maintain immutable audit logs for safety.")
+
+    return rec
 
 
-# ------------------------------------------------------------
-#  CORE FUNCTION: CREATE REPORT FOR CURRENT FILE STATE
-# ------------------------------------------------------------
+# ============================================================
+# CREATE AUDIT REPORT (CORE LOGIC)
+# ============================================================
 def create_audit_report(path: str, prev_snapshot: Optional[Dict[str, Any]] = None):
     p = Path(path)
     if not p.exists():
-        raise FileNotFoundError(f"File not found: {path}")
+        raise FileNotFoundError(f"File does not exist: {path}")
 
     file_size = p.stat().st_size
     new_hash = _streaming_sha256(str(p))
-
     new_lines = read_file_lines(str(p), MAX_SNAPSHOT_LINES)
 
     prev_hash = None
@@ -135,28 +134,25 @@ def create_audit_report(path: str, prev_snapshot: Optional[Dict[str, Any]] = Non
     # Determine status
     if prev_hash is None:
         status = "new"
-        message = "File scanned for the first time."
+        message = "Initial baseline created."
     elif prev_hash == new_hash:
         status = "clean"
-        message = "No tampering detected."
+        message = "No changes detected."
     else:
         status = "tampered"
-        message = "File content changed since last verification."
+        message = "File content changed."
 
         diffs = compute_diff(old_lines, new_lines)
         diff_summary = diffs
-
         added = sum(1 for l in diffs if l.startswith("+") and not l.startswith("+++"))
         removed = sum(1 for l in diffs if l.startswith("-") and not l.startswith("---"))
 
     tampered = status == "tampered"
-
     risk_level, risk_score = risk_score_from_digest(tampered, added, removed, file_size)
 
     report = {
         "report_id": make_report_id(),
         "file_path": str(p.resolve()),
-        "file_size": file_size,
 
         "status": status,
         "message": message,
@@ -173,18 +169,20 @@ def create_audit_report(path: str, prev_snapshot: Optional[Dict[str, Any]] = Non
         "risk_level": risk_level,
         "risk_score": risk_score,
 
-        "generated_at": datetime.utcnow().isoformat() + "Z",
+        "recommendations": generate_recommendations(status, risk_level),
+
+        "file_size": file_size,
         "snapshot_lines": new_lines,
 
-        "recommendations": generate_recommendations(status, risk_level),
+        "generated_at": datetime.utcnow().isoformat() + "Z",
     }
 
     return report
 
 
-# ------------------------------------------------------------
-#  MAIN ENTRY CALLED BY ROUTES
-# ------------------------------------------------------------
+# ============================================================
+# MAIN ENTRY FOR BLUEPRINT
+# ============================================================
 def verify_file_integrity(file_path: str, db, sio=None):
     with file_lock:
         coll = db["audit_logs"]
@@ -192,12 +190,11 @@ def verify_file_integrity(file_path: str, db, sio=None):
         abs_path = str(Path(file_path).resolve())
         existing = coll.find_one({"file_path": abs_path})
 
-        # reconstruct previous snapshot
         prev_snapshot = None
         if existing:
             prev_snapshot = {
                 "last_hash": existing.get("last_hash"),
-                "snapshot": existing.get("snapshot_lines", [])[:MAX_SNAPSHOT_LINES]
+                "snapshot": existing.get("snapshot_lines", [])[:MAX_SNAPSHOT_LINES],
             }
 
         try:
@@ -207,12 +204,11 @@ def verify_file_integrity(file_path: str, db, sio=None):
 
         now = datetime.utcnow()
         now_iso = now.isoformat() + "Z"
-
         snapshot_trimmed = report["snapshot_lines"][:MAX_SNAPSHOT_LINES]
 
-        # ------------------------------------
-        # Store to DB
-        # ------------------------------------
+        # ----------------------------------------------------
+        # DB UPDATE / INSERT
+        # ----------------------------------------------------
         if report["status"] == "new":
             coll.insert_one({
                 "file_path": abs_path,
@@ -222,7 +218,7 @@ def verify_file_integrity(file_path: str, db, sio=None):
                 "tampered": False,
                 "snapshot_lines": snapshot_trimmed,
                 "file_size": report["file_size"],
-                "history": []
+                "history": [],
             })
         else:
             coll.update_one(
@@ -240,33 +236,35 @@ def verify_file_integrity(file_path: str, db, sio=None):
                         "history": {
                             "timestamp_iso": now_iso,
                             "tampered": report["tampered"],
-                            "hash": report["last_hash"]
+                            "hash": report["last_hash"],
                         }
                     }
                 },
-                upsert=True
+                upsert=True,
             )
 
-        # ------------------------------------
-        # Emit real-time alert via Socket.io
-        # ------------------------------------
+        # ----------------------------------------------------
+        # REAL-TIME ALERT VIA WEBSOCKET
+        # ----------------------------------------------------
         if report["tampered"] and sio:
-            payload = {
-                "file_path": abs_path,
-                "hash": report["last_hash"],
-                "timestamp": now_iso,
-                "severity": report["risk_level"],
-                "risk_score": report["risk_score"],
-                "tampered": True
-            }
             try:
-                sio.emit("tamper_alert", payload, broadcast=True)
+                sio.emit(
+                    "tamper_alert",
+                    {
+                        "file_path": abs_path,
+                        "hash": report["last_hash"],
+                        "timestamp": now_iso,
+                        "severity": report["risk_level"],
+                        "risk_score": report["risk_score"],
+                    },
+                    broadcast=True
+                )
             except Exception as e:
                 print("⚠ Socket emit failed:", e)
 
-        # ------------------------------------
-        # Send Email Alert (best effort)
-        # ------------------------------------
+        # ----------------------------------------------------
+        # EMAIL ALERT
+        # ----------------------------------------------------
         if report["tampered"]:
             try:
                 send_tamper_email(
@@ -278,18 +276,18 @@ def verify_file_integrity(file_path: str, db, sio=None):
             except Exception as e:
                 print("⚠ Email alert failed:", e)
 
-        # ------------------------------------
-        # Prepare return report (trim large sections)
-        # ------------------------------------
+        # ----------------------------------------------------
+        # FINAL CLEAN OUTPUT FOR FRONTEND
+        # ----------------------------------------------------
         out = dict(report)
         out["last_verified"] = now_iso
         out["snapshot_sample"] = snapshot_trimmed[:80]
 
-        # fetch last 20 history entries
+        # Attach history (last 20 entries)
         try:
             doc = coll.find_one({"file_path": abs_path}, {"_id": 0, "history": 1})
-            out["history"] = doc.get("history", [])[-20:]
-        except Exception:
+            out["history"] = (doc.get("history") or [])[-20:]
+        except:
             out["history"] = []
 
         return out

@@ -1,4 +1,4 @@
-// src/layouts/DashboardLayout.jsx
+// frontend/src/layouts/DashboardLayout.jsx
 
 import { useEffect, useState } from "react";
 import Sidebar from "../components/ui/Sidebar";
@@ -8,64 +8,61 @@ import socket from "../utils/socket";
 
 export default function DashboardLayout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
-
-  // GLOBAL TOAST STATE
   const [toast, setToast] = useState(null);
 
+  /* ---------------------------------------------------------
+     GLOBAL REAL-TIME ALERT LISTENERS
+     (tampering, ransomware alerts, system events)
+  --------------------------------------------------------- */
   useEffect(() => {
-    // -------------------------------
-    // 🔥 TAMPER ALERT (Audit module)
-    // -------------------------------
-    socket.on("tamper_alert", (data) => {
-      setToast({
-        msg: `Log Tampered: ${data.file_path}`,
-        severity: "danger",
-      });
-    });
+    const pushToast = (msg, severity = "info") => {
+      setToast({ msg, severity });
+      setTimeout(() => setToast(null), 4500);
+    };
 
-    // -------------------------------
-    // 🔥 NEW ALERT (Ransomware & system alerts)
-    // -------------------------------
-    socket.on("new_alert", (data) => {
-      setToast({
-        msg: `${data.title}: ${data.message}`,
-        severity: data.severity || "info",
-      });
-    });
+    const handleTamper = (data) => {
+      pushToast(`Log Tampered: ${data.file_path}`, "tamper");
+    };
 
-    // -------------------------------
-    // 🔥 SYSTEM LOGS ALERT
-    // -------------------------------
-    socket.on("system_log", (log) => {
-      setToast({
-        msg: `New system event: ${log.message}`,
-        severity: log.level || "info",
-      });
-    });
+    const handleAlert = (data) => {
+      pushToast(`${data.title}: ${data.message}`, data.severity || "info");
+    };
 
-    // Cleanup → prevents double listeners during hot reloads
+    const handleSystemEvent = (log) => {
+      pushToast(`System Event: ${log.message}`, log.level || "info");
+    };
+
+    socket.on("tamper_alert", handleTamper);
+    socket.on("new_alert", handleAlert);
+    socket.on("system_log", handleSystemEvent);
+
     return () => {
-      socket.off("tamper_alert");
-      socket.off("new_alert");
-      socket.off("system_log");
+      socket.off("tamper_alert", handleTamper);
+      socket.off("new_alert", handleAlert);
+      socket.off("system_log", handleSystemEvent);
     };
   }, []);
 
   return (
     <div className="flex h-screen overflow-hidden">
 
-      {/* FIXED SIDEBAR */}
+      {/* ---------------------------------------------------------
+         FIXED SIDEBAR
+      --------------------------------------------------------- */}
       <aside className="fixed left-0 top-0 h-full z-30">
         <Sidebar open={sidebarOpen} setOpen={setSidebarOpen} />
       </aside>
 
-      {/* MAIN AREA */}
+      {/* ---------------------------------------------------------
+         MAIN CONTENT AREA
+      --------------------------------------------------------- */}
       <div
         className="flex flex-col flex-1 transition-all duration-300"
         style={{ marginLeft: sidebarOpen ? "256px" : "80px" }}
       >
-
-        {/* FIXED TOP NAVBAR */}
+        {/* ---------------------------------------------------------
+           FIXED TOP NAVBAR
+        --------------------------------------------------------- */}
         <header
           className="fixed top-0 right-0 z-20 transition-all duration-300"
           style={{ left: sidebarOpen ? "256px" : "80px" }}
@@ -73,12 +70,16 @@ export default function DashboardLayout({ children }) {
           <TopNavbar />
         </header>
 
-        {/* PAGE CONTENT */}
+        {/* ---------------------------------------------------------
+           PAGE CONTENT
+        --------------------------------------------------------- */}
         <main className="pt-20 px-6 overflow-auto">
           {children}
         </main>
 
-        {/* 🌟 GLOBAL TOAST COMPONENT */}
+        {/* ---------------------------------------------------------
+           GLOBAL TOAST (Always On)
+        --------------------------------------------------------- */}
         {toast && (
           <Toast
             message={toast.msg}

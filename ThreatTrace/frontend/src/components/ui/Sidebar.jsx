@@ -21,11 +21,13 @@ export default function Sidebar({ open, setOpen }) {
 
   const expanded = open || hovered;
 
-  /* -----------------------------------------------------
-     REAL-TIME ALERT BADGE (new_alert event)
-  ----------------------------------------------------- */
+  /* ---------------------------------------------------------
+     REAL-TIME ALERT BADGE UPDATES
+  --------------------------------------------------------- */
   useEffect(() => {
-    const increment = () => setAlertCount((prev) => prev + 1);
+    const increment = () => {
+      setAlertCount((prev) => prev + 1);
+    };
 
     socket.on("new_alert", increment);
     socket.on("tamper_alert", increment);
@@ -38,9 +40,9 @@ export default function Sidebar({ open, setOpen }) {
     };
   }, []);
 
-  /* -----------------------------------------------------
+  /* ---------------------------------------------------------
      MENU ITEMS
-  ----------------------------------------------------- */
+  --------------------------------------------------------- */
   const menu = [
     { to: "/dashboard", label: "Dashboard", icon: <HomeIcon className="h-6 w-6" /> },
     { to: "/ransomware", label: "Ransomware", icon: <ShieldCheckIcon className="h-6 w-6" /> },
@@ -59,29 +61,27 @@ export default function Sidebar({ open, setOpen }) {
   return (
     <aside
       className={`
-        bg-white/10 backdrop-blur-xl border-r border-white/10 
-        shadow-2xl h-screen flex flex-col transition-all duration-300
+        bg-white/10 backdrop-blur-xl border-r border-white/10 shadow-2xl
+        h-screen flex flex-col transition-all duration-300
         ${expanded ? "w-64" : "w-20"}
       `}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      style={{ minWidth: expanded ? 256 : 80 }}
     >
-      {/* -----------------------------------------------------
-         HEADER
-      ----------------------------------------------------- */}
+      {/* -------------------------------------- */}
+      {/* HEADER */}
+      {/* -------------------------------------- */}
       <header className="flex items-center justify-between p-4 border-b border-white/10">
         <h1
           className={`
-            text-xl font-Orbitron font-bold text-cyberNeon tracking-wide 
-            transition-all duration-300 
+            text-xl font-Orbitron font-bold text-cyberNeon tracking-widest
+            transition-all duration-300
             ${expanded ? "opacity-100" : "opacity-0 w-0"}
           `}
         >
           ThreatTrace
         </h1>
 
-        {/* hamburger */}
         <button
           className="p-2 bg-white/10 rounded-lg border border-white/20 hover:bg-white/20 transition"
           onClick={() => setOpen(!open)}
@@ -97,9 +97,9 @@ export default function Sidebar({ open, setOpen }) {
         </button>
       </header>
 
-      {/* -----------------------------------------------------
-         NAVIGATION
-      ----------------------------------------------------- */}
+      {/* -------------------------------------- */}
+      {/* MENU */}
+      {/* -------------------------------------- */}
       <nav className="flex-1 mt-4 px-3 space-y-2">
         {menu.map((item) => (
           <NavLink
@@ -113,10 +113,10 @@ export default function Sidebar({ open, setOpen }) {
               `
             }
           >
-            {/* Icon */}
+            {/* ICON */}
             <span className="text-cyberNeon">{item.icon}</span>
 
-            {/* Label */}
+            {/* LABEL */}
             <span
               className={`
                 font-medium transition-all duration-300
@@ -126,7 +126,7 @@ export default function Sidebar({ open, setOpen }) {
               {item.label}
             </span>
 
-            {/* Badge */}
+            {/* NOTIFICATION BADGE */}
             {item.badge > 0 && (
               <span
                 className={`
@@ -141,9 +141,9 @@ export default function Sidebar({ open, setOpen }) {
         ))}
       </nav>
 
-      {/* -----------------------------------------------------
-         LOGOUT
-      ----------------------------------------------------- */}
+      {/* -------------------------------------- */}
+      {/* LOGOUT */}
+      {/* -------------------------------------- */}
       <div className="p-4 border-t border-white/10">
         <NavLink
           to="/"

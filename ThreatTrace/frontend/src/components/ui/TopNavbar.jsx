@@ -18,31 +18,36 @@ export default function TopNavbar() {
   const [newAlert, setNewAlert] = useState(false);
 
   /* -------------------------------------------------------
-     REAL-TIME ALERT RECEIVER
+     SOCKET.IO : REAL-TIME ALERT HANDLING
   ------------------------------------------------------- */
   useEffect(() => {
     const handleAlert = (msg) => {
-      const alertMsg =
-        msg?.message || msg?.title || "⚠ Security event detected";
+      const alertText =
+        msg?.message || msg?.title || "⚠ Security Event Detected";
 
       const entry = {
-        message: alertMsg,
+        message: alertText,
         severity: msg?.severity || "info",
         time: new Date().toLocaleString(),
       };
 
+      // add to list
       setNotifications((prev) => [entry, ...prev]);
-      setNewAlert(true);
 
-      // Toast popup
-      setToast(`🔔 ${alertMsg}`);
+      // show toast
+      setToast(alertText);
       setTimeout(() => setToast(null), 3500);
+
+      // bell icon pulse
+      setNewAlert(true);
     };
 
+    // listeners
     socket.on("new_alert", handleAlert);
     socket.on("tamper_alert", handleAlert);
     socket.on("ransomware_alert", handleAlert);
 
+    // cleanup to prevent double listening
     return () => {
       socket.off("new_alert", handleAlert);
       socket.off("tamper_alert", handleAlert);
@@ -58,7 +63,7 @@ export default function TopNavbar() {
         sticky top-0 z-40
       "
     >
-      {/* Toast Notification */}
+      {/* Toast */}
       {toast && <Toast message={toast} onClose={() => setToast(null)} />}
 
       {/* -------------------------------------------------------
@@ -73,18 +78,18 @@ export default function TopNavbar() {
       >
         <MagnifyingGlassIcon className="h-5 w-5 text-cyberNeon" />
         <input
-          placeholder="Search threats, logs, alerts..."
+          placeholder="Search logs, threats, system events..."
           className="bg-transparent w-full focus:outline-none text-white placeholder-gray-300"
         />
       </div>
 
       {/* -------------------------------------------------------
-         RIGHT SIDE BUTTONS (Alerts + User)
+         RIGHT ACTIONS
       ------------------------------------------------------- */}
       <div className="flex items-center gap-6">
 
         {/* -------------------------------------------------------
-           ALERT BELL
+           ALERT BELL + DROPDOWN
         ------------------------------------------------------- */}
         <div
           className="relative group cursor-pointer"
@@ -128,7 +133,7 @@ export default function TopNavbar() {
         </div>
 
         {/* -------------------------------------------------------
-           USER MENU
+           USER MENU DROPDOWN
         ------------------------------------------------------- */}
         <div className="relative">
           <button

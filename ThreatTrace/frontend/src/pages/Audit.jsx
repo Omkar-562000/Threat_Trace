@@ -19,32 +19,35 @@ import socket from "../utils/socket";
 import "./Audit.css";
 
 export default function Audit() {
-  /* ------------------------------------------------------
-     State
-  ------------------------------------------------------ */
+  /* ----------------------------------------
+     STATE
+  ---------------------------------------- */
+  const [toast, setToast] = useState(null);
+
   const [logPath, setLogPath] = useState("");
   const [file, setFile] = useState(null);
-  const [result, setResult] = useState(null); // Latest scan output
-  const [history, setHistory] = useState([]);
-  const [report, setReport] = useState(null);
 
   const [loading, setLoading] = useState(false);
 
-  // Scheduler
+  const [result, setResult] = useState(null);
+  const [history, setHistory] = useState([]);
+  const [report, setReport] = useState(null);
+
+  // Scheduler state
   const [schedRunning, setSchedRunning] = useState(false);
   const [schedInterval, setSchedInterval] = useState(300);
 
-  // Toast
-  const [toast, setToast] = useState(null);
-
+  /* ----------------------------------------
+     Toast helper
+  ---------------------------------------- */
   const pushToast = (msg, severity = "info") => {
     setToast({ msg, severity });
-    setTimeout(() => setToast(null), 4000);
+    setTimeout(() => setToast(null), 4500);
   };
 
-  /* ------------------------------------------------------
-     Load Audit History
-  ------------------------------------------------------ */
+  /* ----------------------------------------
+     Load history
+  ---------------------------------------- */
   const loadHistory = useCallback(async () => {
     const res = await getAuditHistory();
     if (res.status === "success") {
@@ -52,10 +55,10 @@ export default function Audit() {
     }
   }, []);
 
-  /* ------------------------------------------------------
-     Scheduler Status
-  ------------------------------------------------------ */
-  const refreshSchedulerStatus = useCallback(async () => {
+  /* ----------------------------------------
+     Load scheduler status
+  ---------------------------------------- */
+  const loadSchedulerStatus = useCallback(async () => {
     const res = await schedulerStatus();
     if (res.status === "success") {
       setSchedRunning(Boolean(res.scheduler?.running));
@@ -63,16 +66,16 @@ export default function Audit() {
     }
   }, []);
 
-  /* ------------------------------------------------------
-     Socket.io Real-Time Tamper Alerts
-  ------------------------------------------------------ */
+  /* ----------------------------------------
+     Socket: tamper_alert
+  ---------------------------------------- */
   useEffect(() => {
     loadHistory();
-    refreshSchedulerStatus();
+    loadSchedulerStatus();
 
     socket.on("tamper_alert", (payload) => {
       pushToast(
-        `Tamper Detected → ${payload.file_path || "Unknown file"}`,
+        `⚠ Tampering detected: ${payload.file_path}`,
         "tamper"
       );
       loadHistory();
@@ -81,13 +84,14 @@ export default function Audit() {
     return () => {
       socket.off("tamper_alert");
     };
-  }, [loadHistory, refreshSchedulerStatus]);
+  }, [loadHistory, loadSchedulerStatus]);
 
-  /* ------------------------------------------------------
-     Verify by Path
-  ------------------------------------------------------ */
+  /* ----------------------------------------
+     Verify path
+  ---------------------------------------- */
   const handleVerifyPath = async () => {
-    if (!logPath.trim()) return pushToast("Enter a valid file path", "error");
+    if (!logPath.trim())
+      return pushToast("Enter a valid file path", "error");
 
     setLoading(true);
     setResult(null);
@@ -95,15 +99,18 @@ export default function Audit() {
     const res = await verifyByPath(logPath);
 
     setResult(res);
-    pushToast(res.message || "Verification done", res.tampered ? "tamper" : "success");
+    pushToast(
+      res.message || "Verification complete",
+      res.tampered ? "tamper" : "success"
+    );
 
     await loadHistory();
     setLoading(false);
   };
 
-  /* ------------------------------------------------------
-     Upload & Verify
-  ------------------------------------------------------ */
+  /* ----------------------------------------
+     Upload & verify
+  ---------------------------------------- */
   const handleUpload = async () => {
     if (!file) return pushToast("Choose a file first", "error");
 
@@ -113,66 +120,81 @@ export default function Audit() {
     const res = await uploadAndVerify(file);
 
     setResult(res);
-    pushToast(res.message || "Scan completed", res.tampered ? "tamper" : "success");
+    pushToast(
+      res.message || "Scan completed",
+      res.tampered ? "tamper" : "success"
+    );
 
     await loadHistory();
     setFile(null);
     setLoading(false);
   };
 
-  /* ------------------------------------------------------
-     View Detailed Report
-  ------------------------------------------------------ */
-  const viewReport = async (path) => {
-    const res = await getAuditReport(path);
-    if (res.status === "success") setReport(res.report);
-    else pushToast(res.message || "No report found", "error");
+  /* ----------------------------------------
+     View report
+  ---------------------------------------- */
+  const viewReport = async (file_path) => {
+    const res = await getAuditReport(file_path);
+
+    if (res.status === "success") {
+      setReport(res.report);
+    } else {
+      pushToast(res.message || "No report found", "error");
+    }
   };
 
-  /* ------------------------------------------------------
-     Export CSV / PDF
-  ------------------------------------------------------ */
-  const exportCSV = (fp) => exportAuditCSV(fp).catch(() => pushToast("CSV export failed", "error"));
-  const exportPDF = (fp) => exportAuditPDF(fp).catch(() => pushToast("PDF export failed", "error"));
+  /* ----------------------------------------
+     Export handlers
+  ---------------------------------------- */
+  const exportPDFHandler = (fp) =>
+    exportAuditPDF(fp).catch(() =>
+      pushToast("PDF export failed", "error")
+    );
 
-  /* ------------------------------------------------------
-     Scheduler Buttons
-  ------------------------------------------------------ */
-  const startScheduler = async () => {
+  const exportCSVHandler = (fp) =>
+    exportAuditCSV(fp).catch(() =>
+      pushToast("CSV export failed", "error")
+    );
+
+  /* ----------------------------------------
+     Scheduler handlers
+  ---------------------------------------- */
+  const handleStartScheduler = async () => {
     const res = await schedulerStart(schedInterval);
-    pushToast(res.message || "Scheduler Started", res.status === "success" ? "success" : "error");
-    refreshSchedulerStatus();
+    pushToast(res.message, res.status === "success" ? "success" : "error");
+    loadSchedulerStatus();
   };
 
-  const stopScheduler = async () => {
+  const handleStopScheduler = async () => {
     const res = await schedulerStop();
-    pushToast(res.message || "Scheduler Stopped", res.status === "success" ? "info" : "error");
-    refreshSchedulerStatus();
+    pushToast(res.message, res.status === "success" ? "info" : "error");
+    loadSchedulerStatus();
   };
 
-  const runNow = async () => {
+  const handleRunNow = async () => {
     const res = await schedulerRunNow();
-    pushToast(res.message || "Run started", res.status === "success" ? "success" : "error");
+    pushToast(res.message, res.status === "success" ? "success" : "error");
     loadHistory();
   };
 
-  /* ------------------------------------------------------
+  /* ----------------------------------------
      Helpers
-  ------------------------------------------------------ */
+  ---------------------------------------- */
   const fmt = (d) => new Date(d).toLocaleString();
 
-  const diffClass = (line) => {
+  const diffCls = (line) => {
     if (line.startsWith("+") && !line.startsWith("+++")) return "diff-line-add";
     if (line.startsWith("-") && !line.startsWith("---")) return "diff-line-del";
     if (line.startsWith("@@")) return "diff-line-meta";
     return "";
   };
 
-  /* ------------------------------------------------------
+  /* ----------------------------------------
      UI
-  ------------------------------------------------------ */
+  ---------------------------------------- */
   return (
-    <div className="p-6 text-white">
+    <div className="p-6 text-white min-h-screen">
+
       {toast && (
         <Toast
           message={toast.msg}
@@ -181,15 +203,18 @@ export default function Audit() {
         />
       )}
 
-      <h2 className="text-2xl mb-4 text-cyberNeon">Audit Log Integrity Checker</h2>
+      <h1 className="text-3xl font-bold text-cyberNeon mb-6">
+        Audit Log Integrity Checker
+      </h1>
 
-      {/* --------------------------------------------------
-          VERIFY SECTION
-      -------------------------------------------------- */}
-      <div className="grid grid-cols-2 gap-6">
-        {/* Verify via Path */}
+      {/* --------------------------
+          ROW: Verify + Upload
+      --------------------------- */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+        {/* Verify by Path */}
         <div className="glass-cyber p-4 rounded-xl border border-white/10">
-          <h3 className="font-bold mb-2">Verify by File Path</h3>
+          <h3 className="font-semibold mb-2">Verify by File Path</h3>
 
           <input
             className="cyber-input mb-3"
@@ -198,73 +223,93 @@ export default function Audit() {
             onChange={(e) => setLogPath(e.target.value)}
           />
 
-          <button className="cyber-btn" disabled={loading} onClick={handleVerifyPath}>
+          <button
+            className="cyber-btn"
+            disabled={loading}
+            onClick={handleVerifyPath}
+          >
             {loading ? "Verifying..." : "Verify Path"}
           </button>
         </div>
 
-        {/* Upload + Scan */}
+        {/* Upload */}
         <div className="glass-cyber p-4 rounded-xl border border-white/10">
-          <h3 className="font-bold mb-2">Upload & Verify</h3>
+          <h3 className="font-semibold mb-2">Upload & Verify File</h3>
 
-          <input type="file" onChange={(e) => setFile(e.target.files[0])} className="mb-3" />
+          <input
+            type="file"
+            className="mb-3"
+            onChange={(e) => setFile(e.target.files[0])}
+          />
 
-          <button className="cyber-btn" disabled={loading} onClick={handleUpload}>
+          <button
+            className="cyber-btn"
+            disabled={loading}
+            onClick={handleUpload}
+          >
             {loading ? "Scanning..." : "Upload & Scan"}
           </button>
         </div>
       </div>
 
-      {/* --------------------------------------------------
-          SCHEDULER CONTROLS
-      -------------------------------------------------- */}
+      {/* --------------------------
+          Scheduler Controls
+      --------------------------- */}
       <div className="glass-cyber p-4 rounded-xl border border-white/10 mt-6">
-        <h3 className="font-bold mb-2">Scheduler Controls</h3>
+        <h3 className="font-semibold mb-2">Scheduler Controls</h3>
 
-        <div className="flex gap-4 items-center">
+        <div className="flex items-center gap-4">
           <input
             type="number"
             min={30}
+            className="cyber-input w-32"
             value={schedInterval}
             onChange={(e) => setSchedInterval(Number(e.target.value))}
-            className="cyber-input w-32"
           />
 
-          <button className="cyber-btn" onClick={startScheduler}>Start</button>
-          <button className="cyber-btn" onClick={stopScheduler}>Stop</button>
-          <button className="cyber-btn" onClick={runNow}>Run Now</button>
+          <button className="cyber-btn" onClick={handleStartScheduler}>
+            Start
+          </button>
+
+          <button className="cyber-btn" onClick={handleStopScheduler}>
+            Stop
+          </button>
+
+          <button className="cyber-btn" onClick={handleRunNow}>
+            Run Now
+          </button>
 
           <div className="ml-auto text-sm">
-            Status:{" "}
+            Status:
             {schedRunning ? (
-              <span className="text-green-400">Running</span>
+              <span className="text-green-400"> Running</span>
             ) : (
-              <span className="text-red-400">Stopped</span>
+              <span className="text-red-400"> Stopped</span>
             )}
           </div>
         </div>
       </div>
 
-      {/* --------------------------------------------------
-          LATEST RESULT
-      -------------------------------------------------- */}
+      {/* --------------------------
+          Latest Result
+      --------------------------- */}
       <div className="glass-cyber p-4 rounded-xl border border-white/10 mt-6">
-        <h3 className="font-bold mb-2">Latest Result</h3>
+        <h3 className="font-semibold mb-2">Latest Result</h3>
 
         {!result ? (
-          <p className="text-gray-400">No recent scan performed.</p>
+          <p className="text-gray-400">No recent scan.</p>
         ) : (
           <>
             <p><strong>Status:</strong> {result.status}</p>
             <p><strong>Message:</strong> {result.message}</p>
-            <p><strong>Hash:</strong> <code>{result.last_hash || result.hash}</code></p>
+            <p><strong>Hash:</strong> <code>{result.last_hash}</code></p>
 
-            {result.diff_summary && (
-              <div className="mt-3">
-                <h4 className="font-semibold mb-1">Diff Summary</h4>
+            {result.diff_summary && result.diff_summary.length > 0 && (
+              <div className="mt-4">
+                <h4 className="font-semibold">Diff</h4>
                 <pre className="diff-pre">
                   {result.diff_summary.map((line, idx) => (
-                    <div key={idx} className={diffClass(line)}>
+                    <div key={idx} className={diffCls(line)}>
                       {line}
                     </div>
                   ))}
@@ -275,11 +320,11 @@ export default function Audit() {
         )}
       </div>
 
-      {/* --------------------------------------------------
+      {/* --------------------------
           HISTORY TABLE
-      -------------------------------------------------- */}
+      --------------------------- */}
       <div className="glass-cyber p-4 rounded-xl border border-white/10 mt-6">
-        <h3 className="font-bold mb-2">Audit History</h3>
+        <h3 className="font-semibold mb-2">Audit History</h3>
 
         <table className="audit-table w-full text-left">
           <thead>
@@ -293,54 +338,72 @@ export default function Audit() {
           </thead>
 
           <tbody>
-            {history.length === 0 ? (
+            {history.length === 0 && (
               <tr>
                 <td colSpan="5" className="p-4 text-gray-400">
-                  No audit records found.
+                  No audit records
                 </td>
               </tr>
-            ) : (
-              history.map((h) => (
-                <tr key={h.file_path} className="border-t border-white/10">
-                  <td className="p-2">{h.file_path}</td>
-                  <td className="p-2"><code>{String(h.last_hash).slice(0, 20)}...</code></td>
-                  <td className="p-2">{fmt(h.last_verified)}</td>
-                  <td className="p-2">
-                    {h.tampered ? (
-                      <span className="text-red-400">Yes</span>
-                    ) : (
-                      <span className="text-green-400">No</span>
-                    )}
-                  </td>
-                  <td className="p-2 flex gap-2">
-                    <button className="cyber-btn px-3" onClick={() => exportPDF(h.file_path)}>PDF</button>
-                    <button className="cyber-btn px-3" onClick={() => exportCSV(h.file_path)}>CSV</button>
-                    <button className="cyber-btn px-3" onClick={() => viewReport(h.file_path)}>View</button>
-                  </td>
-                </tr>
-              ))
             )}
+
+            {history.map((h, idx) => (
+              <tr key={idx} className="border-t border-white/10">
+                <td className="p-2">{h.file_path}</td>
+                <td className="p-2">
+                  <code>{String(h.last_hash).slice(0, 20)}...</code>
+                </td>
+                <td className="p-2">{fmt(h.last_verified)}</td>
+                <td className="p-2">
+                  {h.tampered ? (
+                    <span className="text-red-400">Yes</span>
+                  ) : (
+                    <span className="text-green-400">No</span>
+                  )}
+                </td>
+
+                <td className="p-2 flex gap-2">
+                  <button className="cyber-btn px-3"
+                    onClick={() => exportPDFHandler(h.file_path)}>
+                    PDF
+                  </button>
+
+                  <button className="cyber-btn px-3"
+                    onClick={() => exportCSVHandler(h.file_path)}>
+                    CSV
+                  </button>
+
+                  <button className="cyber-btn px-3"
+                    onClick={() => viewReport(h.file_path)}>
+                    View
+                  </button>
+                </td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>
 
-      {/* --------------------------------------------------
+      {/* --------------------------
           REPORT PANEL
-      -------------------------------------------------- */}
+      --------------------------- */}
       {report && (
         <div className="glass-cyber p-4 rounded-xl border border-white/10 mt-6">
-          <h3 className="font-bold mb-2">Audit Report for {report.file_path}</h3>
+          <h3 className="font-semibold mb-2">
+            Audit Report — {report.file_path}
+          </h3>
 
           <p><strong>Last Verified:</strong> {fmt(report.last_verified)}</p>
           <p><strong>Last Hash:</strong> <code>{report.last_hash}</code></p>
           <p><strong>Tampered:</strong> {String(report.tampered)}</p>
 
           <div className="mt-3">
-            <h4 className="font-semibold">History</h4>
-            <ul className="mt-2 space-y-1">
-              {report.history?.map((h, idx) => (
+            <h4 className="font-semibold mb-1">History</h4>
+
+            <ul className="space-y-1 mt-2">
+              {report.history?.map((item, idx) => (
                 <li key={idx}>
-                  {fmt(h.timestamp_iso)} — {h.tampered ? "Tampered" : "OK"}
+                  {fmt(item.timestamp_iso)} —{" "}
+                  {item.tampered ? "Tampered" : "OK"}
                 </li>
               ))}
             </ul>

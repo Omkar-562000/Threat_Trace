@@ -1,7 +1,6 @@
 // frontend/src/pages/SystemLogs.jsx
-
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import TimelineChart from "../components/TimelineChart";
+import TimelineChart from "../components/TimelineChart"; // keep if available, else remove
 import Toast from "../components/ui/Toast";
 import {
   downloadExport,
@@ -12,7 +11,7 @@ import socket from "../utils/socket";
 
 export default function SystemLogs() {
   /* ===============================
-     STATES
+     States
   =============================== */
   const [logs, setLogs] = useState([]);
   const [filtered, setFiltered] = useState([]);
@@ -37,33 +36,41 @@ export default function SystemLogs() {
   // auto-refresh
   const [autoRefresh, setAutoRefresh] = useState(true);
 
-  // incoming logs buffer
+  // incoming logs buffer (to avoid re-render storm)
   const logBuffer = useRef([]);
   const bufferTimeout = useRef(null);
 
   /* ===============================
-     SOCKET — REAL-TIME LOGS
+     SOCKET — Real-time Logs
   =============================== */
   const handleSocketLog = useCallback(
     (newLog) => {
       if (!autoRefresh) return;
 
-      logBuffer.current.push(newLog);
+      // Normalize incoming event shape (defensive)
+      const normalized = {
+        timestamp: newLog.timestamp || new Date().toISOString(),
+        level: newLog.level || "INFO",
+        source: newLog.source || "system",
+        message: newLog.message || String(newLog.msg || ""),
+      };
+
+      logBuffer.current.push(normalized);
 
       if (!bufferTimeout.current) {
         bufferTimeout.current = setTimeout(() => {
-          // merge buffered logs
-          setLogs((prev) => [...logBuffer.current, ...prev]);
-          setToast({
-            message: "New system logs received",
-            severity: "info",
+          setLogs((prev) => {
+            // prepend new logs so recent appear first
+            const merged = [...logBuffer.current, ...prev];
+            // keep reasonable cap (e.g., 5000) to avoid memory blowup
+            return merged.slice(0, 5000);
           });
 
-          // timeline update
-          setTimelineData((prev) =>
-            tickTimeline(prev, logBuffer.current)
-          );
+          setToast({ message: "New system logs received", severity: "info" });
+          // update timeline incrementally
+          setTimelineData((prev) => tickTimeline(prev, logBuffer.current));
 
+          // reset buffer
           logBuffer.current = [];
           bufferTimeout.current = null;
         }, 800);
@@ -74,37 +81,40 @@ export default function SystemLogs() {
 
   useEffect(() => {
     socket.on("system_log", handleSocketLog);
+
     return () => {
       socket.off("system_log", handleSocketLog);
-      if (bufferTimeout.current) clearTimeout(bufferTimeout.current);
+      if (bufferTimeout.current) {
+        clearTimeout(bufferTimeout.current);
+        bufferTimeout.current = null;
+      }
     };
   }, [handleSocketLog]);
 
-
   /* ===============================
-     FETCH INITIAL LOGS
+     Fetch initial logs + levels
   =============================== */
   const fetchInitial = useCallback(async () => {
     setLoading(true);
     try {
       const res = await getSystemLogs({ page: 1, per_page: 500 });
-      if (res.status === "success") {
-        setLogs(res.logs);
-        computeTimeline(res.logs);
+      if (res && res.status === "success") {
+        setLogs(res.logs || []);
+        computeTimeline(res.logs || []);
+      } else {
+        setLogs([]);
       }
     } catch (err) {
       console.error("Failed to load logs:", err);
-      setToast({
-        message: "Failed to load logs",
-        severity: "error",
-      });
+      setToast({ message: "Failed to load logs", severity: "error" });
     }
     setLoading(false);
   }, []);
 
   const fetchLevels = useCallback(async () => {
     const res = await getLogLevels();
-    if (res.status === "success") setLevels(res.levels);
+    if (res && res.status === "success") setLevels(res.levels || []);
+    else if (res && res.levels) setLevels(res.levels);
   }, []);
 
   useEffect(() => {
@@ -112,31 +122,30 @@ export default function SystemLogs() {
     fetchLevels();
   }, [fetchInitial, fetchLevels]);
 
-
   /* ===============================
-     FILTERING
+     Filtering
   =============================== */
   const applyFilters = useCallback(() => {
     let out = [...logs];
 
-    const query = q.toLowerCase();
+    const query = q.trim().toLowerCase();
 
     if (query) {
       out = out.filter(
         (l) =>
-          l.message?.toLowerCase().includes(query) ||
-          l.source?.toLowerCase().includes(query) ||
-          l.level?.toLowerCase().includes(query)
+          (l.message || "").toLowerCase().includes(query) ||
+          (l.source || "").toLowerCase().includes(query) ||
+          (l.level || "").toLowerCase().includes(query)
       );
     }
 
-    if (level !== "ALL") {
-      out = out.filter((l) => l.level === level);
+    if (level && level !== "ALL") {
+      out = out.filter((l) => (l.level || "") === level);
     }
 
     if (source.trim()) {
       out = out.filter((l) =>
-        l.source?.toLowerCase().includes(source.toLowerCase())
+        (l.source || "").toLowerCase().includes(source.toLowerCase())
       );
     }
 
@@ -146,8 +155,9 @@ export default function SystemLogs() {
     }
 
     if (dateTo) {
-      const toTS = new Date(dateTo).setHours(23, 59, 59, 999);
-      out = out.filter((l) => new Date(l.timestamp).getTime() <= toTS);
+      const d = new Date(dateTo);
+      d.setHours(23, 59, 59, 999);
+      out = out.filter((l) => new Date(l.timestamp).getTime() <= d.getTime());
     }
 
     setFiltered(out);
@@ -158,16 +168,18 @@ export default function SystemLogs() {
     applyFilters();
   }, [applyFilters]);
 
-
   /* ===============================
-     TIMELINE
+     Timeline helpers
   =============================== */
   const computeTimeline = useCallback((items) => {
     const bucketMap = {};
-
-    items.forEach((l) => {
-      const minute = new Date(l.timestamp).toISOString().slice(0, 16); // YYYY-MM-DDTHH:MM
-      bucketMap[minute] = (bucketMap[minute] || 0) + 1;
+    (items || []).forEach((l) => {
+      try {
+        const minute = new Date(l.timestamp).toISOString().slice(0, 16); // YYYY-MM-DDTHH:MM
+        bucketMap[minute] = (bucketMap[minute] || 0) + 1;
+      } catch {
+        // ignore bad timestamp
+      }
     });
 
     const result = Object.keys(bucketMap)
@@ -178,56 +190,62 @@ export default function SystemLogs() {
   }, []);
 
   const tickTimeline = (prev, newLogs) => {
-    const map = { ...Object.fromEntries(prev.map((p) => [p.time, p.count])) };
+    const map = { ...Object.fromEntries((prev || []).map((p) => [p.time, p.count])) };
 
-    newLogs.forEach((l) => {
-      const bucket = new Date(l.timestamp).toISOString().slice(0, 16);
-      map[bucket] = (map[bucket] || 0) + 1;
+    (newLogs || []).forEach((l) => {
+      try {
+        const bucket = new Date(l.timestamp).toISOString().slice(0, 16);
+        map[bucket] = (map[bucket] || 0) + 1;
+      } catch {
+        // ignore
+      }
     });
 
     const sorted = Object.keys(map)
       .sort()
       .map((k) => ({ time: k, count: map[k] }));
 
+    // keep last N buckets
     return sorted.slice(-120);
   };
 
-
   /* ===============================
-     PAGINATION
+     Pagination
   =============================== */
   const paginated = useMemo(
     () => filtered.slice((page - 1) * perPage, page * perPage),
     [filtered, page]
   );
 
-
   /* ===============================
-     EXPORT HANDLERS
+     Exports
   =============================== */
   const exportCSV = () => {
     downloadExport("csv", { q, level, source });
-    setToast({
-      message: "CSV export started",
-      severity: "info",
-    });
+    setToast({ message: "CSV export started", severity: "info" });
   };
 
   const exportPDF = () => {
     downloadExport("pdf", { q, level, source });
-    setToast({
-      message: "PDF export started",
-      severity: "info",
-    });
+    setToast({ message: "PDF export started", severity: "info" });
   };
 
+  /* ===============================
+     UI Helpers
+  =============================== */
+  const fmt = (ts) => {
+    try {
+      return new Date(ts).toLocaleString();
+    } catch {
+      return ts;
+    }
+  };
 
   /* ===============================
-     UI
+     Render
   =============================== */
   return (
     <div className="p-6 text-white flex gap-6 min-h-screen">
-
       {/* Toast */}
       {toast && (
         <Toast
@@ -237,14 +255,10 @@ export default function SystemLogs() {
         />
       )}
 
-      {/* =============================== */}
       {/* LEFT FILTER PANEL */}
-      {/* =============================== */}
       <aside className="w-80 glass-cyber p-4 rounded-xl flex-shrink-0 border border-white/10">
-
         <h3 className="text-lg font-semibold mb-3">Filters</h3>
 
-        {/* Search */}
         <div className="mb-4">
           <label className="text-sm text-gray-300">Search</label>
           <input
@@ -255,7 +269,6 @@ export default function SystemLogs() {
           />
         </div>
 
-        {/* Level */}
         <div className="mb-4">
           <label className="text-sm text-gray-300">Level</label>
           <select
@@ -272,7 +285,6 @@ export default function SystemLogs() {
           </select>
         </div>
 
-        {/* Source */}
         <div className="mb-4">
           <label className="text-sm text-gray-300">Source</label>
           <input
@@ -283,7 +295,6 @@ export default function SystemLogs() {
           />
         </div>
 
-        {/* Date Range */}
         <div className="grid grid-cols-2 gap-2 mb-4">
           <div>
             <label className="text-sm text-gray-300">From</label>
@@ -306,7 +317,6 @@ export default function SystemLogs() {
           </div>
         </div>
 
-        {/* Buttons */}
         <div className="flex gap-2">
           <button className="cyber-btn flex-1" onClick={applyFilters}>
             Apply
@@ -320,17 +330,13 @@ export default function SystemLogs() {
               setSource("");
               setDateFrom("");
               setDateTo("");
-              setToast({
-                message: "Filters cleared",
-                severity: "info",
-              });
+              setToast({ message: "Filters cleared", severity: "info" });
             }}
           >
             Clear
           </button>
         </div>
 
-        {/* Auto Refresh */}
         <div className="mt-4">
           <label className="flex items-center gap-2">
             <input
@@ -342,7 +348,6 @@ export default function SystemLogs() {
           </label>
         </div>
 
-        {/* Export */}
         <div className="mt-6 flex flex-col gap-2">
           <button className="cyber-btn" onClick={exportCSV}>
             Export CSV
@@ -353,22 +358,22 @@ export default function SystemLogs() {
         </div>
       </aside>
 
-      {/* =============================== */}
       {/* RIGHT SIDE */}
-      {/* =============================== */}
       <main className="flex-1">
-
         {/* Graph */}
         <div className="glass-cyber p-4 mb-4 rounded-xl border border-white/10">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-bold">System Logs Timeline</h2>
-            <span className="text-sm text-gray-300">
-              {filtered.length} logs
-            </span>
+            <span className="text-sm text-gray-300">{filtered.length} logs</span>
           </div>
 
           <div className="mt-3">
-            <TimelineChart data={timelineData} height={80} />
+            {/* TimelineChart is optional — keep or replace with a simple summary */}
+            {typeof TimelineChart === "function" ? (
+              <TimelineChart data={timelineData} height={80} />
+            ) : (
+              <div className="text-sm text-gray-300">Timeline unavailable</div>
+            )}
           </div>
         </div>
 
@@ -387,9 +392,7 @@ export default function SystemLogs() {
             <tbody>
               {paginated.map((log, idx) => (
                 <tr key={idx} className="hover:bg-white/5">
-                  <td className="p-2">
-                    {new Date(log.timestamp).toLocaleString()}
-                  </td>
+                  <td className="p-2">{fmt(log.timestamp)}</td>
 
                   <td className="p-2">
                     <span
@@ -408,9 +411,17 @@ export default function SystemLogs() {
                   </td>
 
                   <td className="p-2">{log.source}</td>
-                  <td className="p-2">{log.message}</td>
+                  <td className="p-2 break-words">{log.message}</td>
                 </tr>
               ))}
+
+              {paginated.length === 0 && (
+                <tr>
+                  <td colSpan="4" className="p-4 text-gray-400">
+                    {loading ? "Loading logs..." : "No logs to display."}
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
 
@@ -419,7 +430,7 @@ export default function SystemLogs() {
             <button
               className="cyber-btn px-4 py-1"
               disabled={page === 1}
-              onClick={() => setPage(page - 1)}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
             >
               Prev
             </button>
@@ -431,13 +442,12 @@ export default function SystemLogs() {
             <button
               className="cyber-btn px-4 py-1"
               disabled={page * perPage >= filtered.length}
-              onClick={() => setPage(page + 1)}
+              onClick={() => setPage((p) => p + 1)}
             >
               Next
             </button>
           </div>
         </div>
-
       </main>
     </div>
   );

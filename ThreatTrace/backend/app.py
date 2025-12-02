@@ -12,7 +12,8 @@ This file bootstraps the entire backend:
 ✓ APScheduler (background integrity scans)
 ✓ Alert System Initialization (WebSocket + Email + DB)
 ✓ Blueprint Registration (Auth, Audit, Ransomware, Logs, Alerts, Reports)
-✓ Graceful Shutdown for scheduler + SocketIO
+✓ Legacy Compatibility Routes (important)
+✓ Graceful Shutdown
 """
 
 import atexit
@@ -38,39 +39,33 @@ app.config.from_object(Config)
 
 
 # ============================================================
-# 2️⃣ CORE EXTENSIONS
+# 2️⃣ CORE EXTENSIONS (CORS + MAIL + JWT + BCRYPT + SOCKET.IO)
 # ============================================================
-
-# ---- CORS for React Frontend ----
 CORS(
     app,
-   resources={r"/api/*": {
+    resources={r"/api/*": {
         "origins": [
             "http://localhost:5173",
             "http://127.0.0.1:5173",
-            "http://172.20.10.3:5173"   # Your mobile hotspot / LAN IP
+            "http://172.20.10.3:5173",   # your LAN/hotspot IP
         ]
     }},
     supports_credentials=True
 )
 
-# ---- Flask-Mail ----
 mail = Mail(app)
 app.config["MAIL"] = mail
 
-# ---- JWT Auth ----
 jwt = JWTManager(app)
 app.config["JWT"] = jwt
 
-# ---- Password hashing ----
 bcrypt = Bcrypt(app)
 app.config["BCRYPT"] = bcrypt
 
-# ---- Socket.IO for realtime events ----
 socketio = SocketIO(
     app,
     cors_allowed_origins="*",
-    async_mode="eventlet"  # REQUIRED for real-time stability
+    async_mode="eventlet",
 )
 app.config["SOCKETIO"] = socketio
 
@@ -79,7 +74,7 @@ app.config["SOCKETIO"] = socketio
 # 3️⃣ ALERT SYSTEM INITIALIZATION
 # ============================================================
 from utils.alert_manager import init_alert_system
-init_alert_system(socketio)   # Enables unified WebSocket alerts
+init_alert_system(socketio)
 
 
 # ============================================================
@@ -90,7 +85,7 @@ app.config["DB"] = db
 
 
 # ============================================================
-# 5️⃣ APSCHEDULER BACKGROUND JOBS
+# 5️⃣ APSCHEDULER
 # ============================================================
 scheduler = BackgroundScheduler()
 scheduler.start()
@@ -101,40 +96,50 @@ app.config["SCHEDULER"] = scheduler
 # 6️⃣ IMPORT & REGISTER ROUTES
 # ============================================================
 
-# Auth MUST be imported after mail initialization
+# Import blueprints
 from routes.auth_routes import auth_bp, init_mail
-init_mail(app)
-
 from routes.ransomware_routes import ransomware_bp
 from routes.audit_routes import audit_bp
 from routes.logs_routes import logs_bp
 from routes.alerts_routes import alerts_bp
 from routes.reports_routes import reports_bp
 
-# Optional scheduler routes
+# Scheduler (optional)
 try:
     from routes.scheduler_routes import scheduler_bp
 except Exception:
     scheduler_bp = None
 
+# Mail setup
+init_mail(app)
 
-# ---- Register Blueprints ----
-try:
-    app.register_blueprint(auth_bp, url_prefix="/api/auth")
-    app.register_blueprint(ransomware_bp, url_prefix="/api/ransomware")
-    app.register_blueprint(audit_bp, url_prefix="/api/audit")
-    app.register_blueprint(logs_bp, url_prefix="/api/logs")
-    app.register_blueprint(alerts_bp, url_prefix="/api/alerts")
-    app.register_blueprint(reports_bp, url_prefix="/api/reports")
+# ------------------------------------------------------------
+# MAIN REGISTRATIONS
+# ------------------------------------------------------------
+app.register_blueprint(auth_bp, url_prefix="/api/auth")
+app.register_blueprint(ransomware_bp, url_prefix="/api/ransomware")
+app.register_blueprint(audit_bp, url_prefix="/api/audit")
+app.register_blueprint(logs_bp, url_prefix="/api/logs")
+app.register_blueprint(alerts_bp, url_prefix="/api/alerts")
+app.register_blueprint(reports_bp, url_prefix="/api/reports")
 
-    if scheduler_bp:
-        app.register_blueprint(scheduler_bp, url_prefix="/api/scheduler")
+if scheduler_bp:
+    app.register_blueprint(scheduler_bp, url_prefix="/api/scheduler")
 
-    print("✅ All API routes registered successfully!\n")
+# ------------------------------------------------------------
+# 🔥 **LEGACY / COMPATIBILITY ROUTES**
+# Makes older frontend routes work:
+#    POST /api/scan
+#    POST /api/upload
+#    GET  /api/logs
+# ------------------------------------------------------------
+# WARNING:
+# This does NOT override existing paths inside ransomware_bp.
+# It simply adds the same routes under an additional prefix.
+app.register_blueprint(ransomware_bp, url_prefix="/api")
 
-except Exception as e:
-    print("❌ ERROR registering blueprints:", e)
-    raise e
+
+print("✅ All API routes registered successfully!\n")
 
 
 # ============================================================
@@ -151,7 +156,7 @@ def index():
 
 
 # ============================================================
-# 8️⃣ GRACEFUL SHUTDOWN (scheduler + SocketIO)
+# 8️⃣ GRACEFUL SHUTDOWN
 # ============================================================
 def shutdown_handler(signum=None, frame=None):
     print("\n⚠️ Shutting down ThreatTrace backend...")
@@ -161,7 +166,7 @@ def shutdown_handler(signum=None, frame=None):
             scheduler.shutdown(wait=False)
             print("🛑 Scheduler stopped.")
     except:
-        print("Scheduler not running.")
+        print("⚠ Scheduler not running or already closed.")
 
     sys.exit(0)
 
@@ -175,7 +180,7 @@ signal.signal(signal.SIGTERM, shutdown_handler)
 # 9️⃣ RUN SERVER
 # ============================================================
 if __name__ == "__main__":
-    print("🚀 ThreatTrace backend running at http://127.0.0.1:5000\n")
+    print("🚀 ThreatTrace backend running at http://127.0.0.1:5000")
 
     socketio.run(
         app,
