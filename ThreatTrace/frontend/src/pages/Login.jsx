@@ -1,120 +1,97 @@
+// frontend/src/pages/Login.jsx
 import axios from "axios";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 export default function Login() {
-    const navigate = useNavigate();
+  const navigate = useNavigate();
 
-    const [formData, setFormData] = useState({
-        email: "",
-        password: "",
-    });
+  const [formData, setFormData] = useState({
+    email: "",
+    password: "",
+  });
 
-    const [loading, setLoading] = useState(false);
-    const [errorMsg, setErrorMsg] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
 
-    const handleChange = (e) => {
-        setFormData({ ...formData, [e.target.name]: e.target.value });
-    };
+  const handleChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
 
-    const handleLogin = async (e) => {
-        e.preventDefault();
-        setLoading(true);
-        setErrorMsg("");
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setErrorMsg("");
 
-        try {
-            const res = await axios.post(
-                "http://127.0.0.1:5000/api/auth/login",
-                formData
-            );
+    try {
+      const res = await axios.post(
+        "http://127.0.0.1:5000/api/auth/login",
+        formData
+      );
 
-            localStorage.setItem("token", res.data.token);
-            navigate("/dashboard");
-        } catch (error) {
-            setErrorMsg("Invalid email or password");
-        } finally {
-            setLoading(false);
-        }
-    };
+      const token = res.data.token;
+      const role = res.data.user?.role || "personal"; // fallback
 
-    return (
-        <div className="min-h-screen flex items-center justify-center">
-            
-            {/* Outer container with cyber glow */}
-            <div className="glass-cyber w-[380px] p-8 shadow-neon">
+      localStorage.setItem("token", token);
+      localStorage.setItem("role", role);
 
-                <h2 className="text-3xl cyber-gradient-text text-center mb-6">
-                    Welcome Back
-                </h2>
+      navigate("/dashboard");
+    } catch {
+      setErrorMsg("Invalid email or password");
+    } finally {
+      setLoading(false);
+    }
+  };
 
-                <p className="text-gray-300 text-center mb-6">
-                    Login to continue to <span className="neon-text">ThreatTrace</span>
-                </p>
+  return (
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="glass-cyber w-[380px] p-8 shadow-neon">
+        <h2 className="text-3xl cyber-gradient-text text-center mb-6">
+          Welcome Back
+        </h2>
 
-                {/* Login Form */}
-                <form onSubmit={handleLogin} className="space-y-5">
+        <p className="text-gray-300 text-center mb-6">
+          Login to <span className="neon-text">ThreatTrace</span>
+        </p>
 
-                    <div>
-                        <label className="text-sm text-gray-300">Email</label>
-                        <input
-                            type="email"
-                            name="email"
-                            placeholder="Enter your email"
-                            value={formData.email}
-                            onChange={handleChange}
-                            className="cyber-input mt-1"
-                            required
-                        />
-                    </div>
+        <form onSubmit={handleLogin} className="space-y-5">
+          <div>
+            <label className="text-sm text-gray-300">Email</label>
+            <input
+              type="email"
+              name="email"
+              className="cyber-input mt-1"
+              value={formData.email}
+              onChange={handleChange}
+              required
+            />
+          </div>
 
-                    <div>
-                        <label className="text-sm text-gray-300">Password</label>
-                        <input
-                            type="password"
-                            name="password"
-                            placeholder="Enter your password"
-                            value={formData.password}
-                            onChange={handleChange}
-                            className="cyber-input mt-1"
-                            required
-                        />
-                    </div>
+          <div>
+            <label className="text-sm text-gray-300">Password</label>
+            <input
+              type="password"
+              name="password"
+              className="cyber-input mt-1"
+              value={formData.password}
+              onChange={handleChange}
+              required
+            />
+          </div>
 
-                    {errorMsg && (
-                        <p className="text-red-400 text-sm text-center">{errorMsg}</p>
-                    )}
+          {errorMsg && (
+            <p className="text-red-400 text-sm text-center">{errorMsg}</p>
+          )}
 
-                    <button
-                        type="submit"
-                        disabled={loading}
-                        className="cyber-btn w-full py-2 mt-2"
-                    >
-                        {loading ? "Logging in..." : "Login"}
-                    </button>
-                </form>
-
-                {/* Links Section */}
-                <div className="mt-6 text-center">
-
-                    <button
-                        onClick={() => navigate("/forgot-password")}
-                        className="text-cyberNeon hover:underline text-sm"
-                    >
-                        Forgot Password?
-                    </button>
-
-                    <p className="mt-3 text-sm text-gray-300">
-                        Don't have an account?{" "}
-                        <button
-                            onClick={() => navigate("/signup")}
-                            className="text-cyberPurple hover:underline"
-                        >
-                            Create Account
-                        </button>
-                    </p>
-
-                </div>
-            </div>
-        </div>
-    );
+          <button
+            type="submit"
+            disabled={loading}
+            className="cyber-btn w-full"
+          >
+            {loading ? "Logging in..." : "Login"}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
 }

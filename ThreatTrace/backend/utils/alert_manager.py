@@ -86,7 +86,7 @@ def send_alert(title, message, severity="info", source="system"):
     # ---------------------------------------------------------
     try:
         if socketio_instance:
-            socketio_instance.emit("new_alert", alert, broadcast=True)
+            socketio_instance.emit("new_alert", alert)
             print(f"🚨 REAL-TIME ALERT SENT → {alert}")
         else:
             print("⚠️ WebSocket not initialized. (Skipping realtime alert)")

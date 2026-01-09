@@ -16,6 +16,6 @@ def emit_log_event(app, log_doc):
                 "message": log_doc.get("message"),
             }
             # emit to "system_log" channel
-            socketio.emit("system_log", payload, broadcast=True)
+            socketio.emit("system_log", payload)
     except Exception as e:
         print("log_streamer.emit_log_event error:", e)

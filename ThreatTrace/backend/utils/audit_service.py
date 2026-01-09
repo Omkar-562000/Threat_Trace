@@ -257,7 +257,6 @@ def verify_file_integrity(file_path: str, db, sio=None):
                         "severity": report["risk_level"],
                         "risk_score": report["risk_score"],
                     },
-                    broadcast=True
                 )
             except Exception as e:
                 print("⚠ Socket emit failed:", e)

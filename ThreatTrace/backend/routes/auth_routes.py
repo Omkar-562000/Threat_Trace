@@ -49,10 +49,11 @@ def register():
         hashed_pw = bcrypt.generate_password_hash(password).decode("utf-8")
 
         users.insert_one({
-            "name": name,
-            "email": email,
-            "password": hashed_pw,
-            "created_at": datetime.utcnow()
+        "name": name,
+        "email": email,
+        "password": hashed_pw,
+        "role": "personal",   # default role
+        "created_at": datetime.utcnow()
         })
 
         return jsonify({"status": "success", "message": "Account created successfully"}), 201
@@ -85,19 +86,23 @@ def login():
 
         # Create JWT
         token = create_access_token(
-            identity=str(user["_id"]),
+            identity={
+                "user_id": str(user["_id"]),
+                "role": user.get("role", "personal")
+            },
             expires_delta=timedelta(hours=12)
-        )
-
+        )   
         return jsonify({
             "status": "success",
             "token": token,
             "user": {
                 "id": str(user["_id"]),
                 "name": user["name"],
-                "email": user["email"]
+                "email": user["email"],
+                "role": user.get("role", "personal")
             }
         }), 200
+
 
     except Exception as e:
         print("❌ LOGIN ERROR:", e)

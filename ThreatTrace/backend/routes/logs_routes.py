@@ -4,6 +4,7 @@ import io
 import csv
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
+from utils.role_guard import role_required
 
 logs_bp = Blueprint("logs_bp", __name__)
 
@@ -154,7 +155,7 @@ def ingest_log():
 
         # Realtime streaming → SystemLogs.jsx
         sio = current_app.config["SOCKETIO"]
-        sio.emit("system_log", serialize_log(entry), broadcast=True)
+        sio.emit("system_log", serialize_log(entry))
 
         return jsonify({"status": "success"}), 200
 
@@ -255,3 +256,7 @@ def export_logs():
     except Exception as e:
         print("export_logs error:", e)
         return jsonify({"status": "error", "message": str(e)}), 500
+
+@logs_bp.route("/export", methods=["GET"])
+@role_required("enterprise", "corporate")
+def export_logs():

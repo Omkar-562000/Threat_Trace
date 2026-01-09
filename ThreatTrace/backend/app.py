@@ -136,7 +136,6 @@ if scheduler_bp:
 # WARNING:
 # This does NOT override existing paths inside ransomware_bp.
 # It simply adds the same routes under an additional prefix.
-app.register_blueprint(ransomware_bp, url_prefix="/api")
 
 
 print("✅ All API routes registered successfully!\n")

@@ -7,6 +7,8 @@ from werkzeug.utils import secure_filename
 
 from utils.audit_service import verify_file_integrity
 from utils.email_alerts import send_tamper_email
+from utils.role_guard import role_required
+
 
 audit_bp = Blueprint("audit_bp", __name__)
 
@@ -213,3 +215,11 @@ def export_csv():
 @audit_bp.route("/test", methods=["GET"])
 def test():
     return jsonify({"status": "success", "message": "Audit module active"}), 200
+
+@audit_bp.route("/export/csv", methods=["GET"])
+@role_required("enterprise", "corporate")
+def export_csv():
+
+@audit_bp.route("/export/pdf", methods=["GET"])
+@role_required("enterprise", "corporate")
+def export_pdf():
