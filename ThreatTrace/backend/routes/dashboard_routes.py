@@ -18,9 +18,9 @@ dashboard_bp = Blueprint("dashboard", __name__)
 # ============================================================
 def get_collections():
     """Get MongoDB collections"""
-    db = current_app.config.get("DB")
-    if not db:
+    if "DB" not in current_app.config:
         raise Exception("Database not initialized")
+    db = current_app.config["DB"]
     return {
         'alerts': db['alerts'],
         'logs': db['logs'],
