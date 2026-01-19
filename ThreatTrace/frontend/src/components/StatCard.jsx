@@ -20,25 +20,25 @@ export default function StatCard({ title, value, subtitle, icon, trend, color = 
   };
 
   return (
-    <div className={`relative overflow-hidden bg-gradient-to-br ${colorStyles[color]} border backdrop-blur-xl rounded-2xl p-6 hover:scale-105 transition-transform duration-300`}>
+    <div className={`relative overflow-hidden bg-gradient-to-br ${colorStyles[color]} border backdrop-blur-xl rounded-xl md:rounded-2xl p-4 sm:p-5 md:p-6 hover:scale-105 transition-transform duration-300`}>
       {/* Background decoration */}
-      <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-3xl -mr-16 -mt-16"></div>
+      <div className="absolute top-0 right-0 w-24 h-24 sm:w-32 sm:h-32 bg-white/5 rounded-full blur-3xl -mr-12 -mt-12 sm:-mr-16 sm:-mt-16"></div>
       
       <div className="relative">
         {/* Icon */}
         {icon && (
-          <div className={`mb-3 ${iconColors[color]}`}>
+          <div className={`mb-2 sm:mb-3 ${iconColors[color]}`}>
             {icon}
           </div>
         )}
         
         {/* Title */}
-        <div className="text-sm font-medium text-gray-400 mb-1 uppercase tracking-wider">
+        <div className="text-xs sm:text-sm font-medium text-gray-400 mb-1 uppercase tracking-wider">
           {title}
         </div>
         
         {/* Value */}
-        <div className="text-3xl font-bold text-white mb-2">
+        <div className="text-2xl sm:text-3xl font-bold text-white mb-1 sm:mb-2">
           {value}
         </div>
         
@@ -51,10 +51,11 @@ export default function StatCard({ title, value, subtitle, icon, trend, color = 
         
         {/* Trend indicator */}
         {trend && (
-          <div className={`mt-2 text-xs font-semibold ${trend.type === 'up' ? 'text-green-400' : trend.type === 'down' ? 'text-red-400' : 'text-gray-400'}`}>
+          <div className={`mt-1 sm:mt-2 text-xs font-semibold ${trend.type === 'up' ? 'text-green-400' : trend.type === 'down' ? 'text-red-400' : 'text-gray-400'}`}>
             {trend.type === 'up' && '↑'}
             {trend.type === 'down' && '↓'}
-            {trend.value}
+            <span className="hidden sm:inline"> {trend.value}</span>
+            <span className="sm:hidden"> {trend.value.split(' ')[0]}</span>
           </div>
         )}
       </div>

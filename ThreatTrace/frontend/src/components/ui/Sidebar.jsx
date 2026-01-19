@@ -13,9 +13,10 @@ import {
   InboxIcon,
   ServerStackIcon,
   ShieldCheckIcon,
+  XMarkIcon,
 } from "@heroicons/react/24/outline";
 
-export default function Sidebar({ open, setOpen }) {
+export default function Sidebar({ open, setOpen, mobileMenuOpen, setMobileMenuOpen }) {
   const [hovered, setHovered] = useState(false);
   const [alertCount, setAlertCount] = useState(0);
 
@@ -65,8 +66,8 @@ export default function Sidebar({ open, setOpen }) {
         h-screen flex flex-col transition-all duration-300
         ${expanded ? "w-64" : "w-20"}
       `}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
+      onMouseEnter={() => !mobileMenuOpen && setHovered(true)}
+      onMouseLeave={() => !mobileMenuOpen && setHovered(false)}
     >
       {/* -------------------------------------- */}
       {/* HEADER */}
@@ -74,7 +75,7 @@ export default function Sidebar({ open, setOpen }) {
       <header className="flex items-center justify-between p-4 border-b border-white/10">
         <h1
           className={`
-            text-xl font-Orbitron font-bold text-cyberNeon tracking-widest
+            text-lg sm:text-xl font-Orbitron font-bold text-cyberNeon tracking-widest
             transition-all duration-300
             ${expanded ? "opacity-100" : "opacity-0 w-0"}
           `}
@@ -82,8 +83,9 @@ export default function Sidebar({ open, setOpen }) {
           ThreatTrace
         </h1>
 
+        {/* Desktop toggle button */}
         <button
-          className="p-2 bg-white/10 rounded-lg border border-white/20 hover:bg-white/20 transition"
+          className="hidden lg:block p-2 bg-white/10 rounded-lg border border-white/20 hover:bg-white/20 transition"
           onClick={() => setOpen(!open)}
         >
           <svg
@@ -95,31 +97,45 @@ export default function Sidebar({ open, setOpen }) {
             <path strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
           </svg>
         </button>
+
+        {/* Mobile close button */}
+        <button
+          className="lg:hidden p-2 bg-white/10 rounded-lg border border-white/20 hover:bg-white/20 transition"
+          onClick={() => setMobileMenuOpen(false)}
+        >
+          <XMarkIcon className="w-5 h-5 text-cyberNeon" />
+        </button>
       </header>
 
       {/* -------------------------------------- */}
       {/* MENU */}
       {/* -------------------------------------- */}
-      <nav className="flex-1 mt-4 px-3 space-y-2">
+      <nav className="flex-1 mt-4 px-3 space-y-2 overflow-y-auto">
         {menu.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
+            onClick={() => {
+              // Close mobile menu on navigation
+              if (window.innerWidth < 1024) {
+                setMobileMenuOpen(false);
+              }
+            }}
             className={({ isActive }) =>
               `
-              flex items-center gap-4 p-3 rounded-lg transition-all text-white relative
+              flex items-center gap-3 sm:gap-4 p-2 sm:p-3 rounded-lg transition-all text-white relative
               hover:bg-cyberNeon/10 
               ${isActive ? "bg-cyberNeon/10 border border-cyberNeon/30" : ""}
               `
             }
           >
             {/* ICON */}
-            <span className="text-cyberNeon">{item.icon}</span>
+            <span className="text-cyberNeon flex-shrink-0">{item.icon}</span>
 
             {/* LABEL */}
             <span
               className={`
-                font-medium transition-all duration-300
+                font-medium text-sm sm:text-base transition-all duration-300
                 ${expanded ? "opacity-100" : "opacity-0 w-0"}
               `}
             >
@@ -130,7 +146,7 @@ export default function Sidebar({ open, setOpen }) {
             {item.badge > 0 && (
               <span
                 className={`
-                  absolute right-3 text-xs px-2 py-1 rounded-full bg-red-500 text-white
+                  absolute right-2 sm:right-3 text-xs px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full bg-red-500 text-white
                   ${expanded ? "" : "hidden"}
                 `}
               >
@@ -144,15 +160,22 @@ export default function Sidebar({ open, setOpen }) {
       {/* -------------------------------------- */}
       {/* LOGOUT */}
       {/* -------------------------------------- */}
-      <div className="p-4 border-t border-white/10">
+      <div className="p-3 sm:p-4 border-t border-white/10">
         <NavLink
           to="/"
-          className="flex items-center gap-4 p-3 rounded-lg text-white hover:bg-white/10"
+          onClick={() => {
+            localStorage.removeItem("access_token");
+            localStorage.removeItem("role");
+            if (window.innerWidth < 1024) {
+              setMobileMenuOpen(false);
+            }
+          }}
+          className="flex items-center gap-3 sm:gap-4 p-2 sm:p-3 rounded-lg text-white hover:bg-white/10"
         >
-          <ArrowRightOnRectangleIcon className="h-6 w-6 text-pink-400" />
+          <ArrowRightOnRectangleIcon className="h-5 w-5 sm:h-6 sm:w-6 text-pink-400 flex-shrink-0" />
           <span
             className={`
-              transition-all duration-300
+              text-sm sm:text-base transition-all duration-300
               ${expanded ? "opacity-100" : "opacity-0 w-0"}
             `}
           >

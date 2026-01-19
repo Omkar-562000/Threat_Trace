@@ -242,6 +242,63 @@ body {
   .audit-table td, .audit-table th { font-size: 0.85rem; padding: 8px; }
 }
 
+/* ====== RESPONSIVE UTILITIES ====== */
+/* Hide scrollbar on mobile for cleaner look */
+@media (max-width: 640px) {
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 4px;
+  }
+  
+  /* Reduce animations on mobile for performance */
+  @media (prefers-reduced-motion: reduce) {
+    * {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+/* Ensure glassmorphism works on all devices */
+@supports not (backdrop-filter: blur(15px)) {
+  .glass-cyber {
+    background: rgba(255, 255, 255, 0.12);
+  }
+}
+
+/* Mobile-first responsive container */
+.responsive-container {
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+@media (min-width: 640px) {
+  .responsive-container {
+    max-width: 640px;
+  }
+}
+
+@media (min-width: 768px) {
+  .responsive-container {
+    max-width: 768px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .responsive-container {
+    max-width: 1024px;
+  }
+}
+
+@media (min-width: 1280px) {
+  .responsive-container {
+    max-width: 1280px;
+  }
+}
+
 /* Toast Animations */
 @keyframes slideUp {
     0% { opacity: 0; transform: translateY(20px); }

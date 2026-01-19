@@ -8,6 +8,7 @@ import socket from "../utils/socket";
 
 export default function DashboardLayout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [toast, setToast] = useState(null);
 
   /* ---------------------------------------------------------
@@ -43,37 +44,79 @@ export default function DashboardLayout({ children }) {
     };
   }, []);
 
+  /* ---------------------------------------------------------
+     CLOSE MOBILE MENU ON DESKTOP RESIZE
+  --------------------------------------------------------- */
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth >= 1024) {
+        setMobileMenuOpen(false);
+      }
+    };
+
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex h-screen overflow-hidden bg-cyberDark">
 
       {/* ---------------------------------------------------------
-         FIXED SIDEBAR
+         MOBILE OVERLAY (when menu is open)
       --------------------------------------------------------- */}
-      <aside className="fixed left-0 top-0 h-full z-30">
-        <Sidebar open={sidebarOpen} setOpen={setSidebarOpen} />
+      {mobileMenuOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          onClick={() => setMobileMenuOpen(false)}
+        />
+      )}
+
+      {/* ---------------------------------------------------------
+         SIDEBAR - Desktop: fixed, Mobile: drawer overlay
+      --------------------------------------------------------- */}
+      <aside
+        className={`
+          fixed left-0 top-0 h-full z-50 transition-transform duration-300
+          lg:z-30
+          ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
+        `}
+      >
+        <Sidebar
+          open={sidebarOpen}
+          setOpen={setSidebarOpen}
+          mobileMenuOpen={mobileMenuOpen}
+          setMobileMenuOpen={setMobileMenuOpen}
+        />
       </aside>
 
       {/* ---------------------------------------------------------
          MAIN CONTENT AREA
       --------------------------------------------------------- */}
       <div
-        className="flex flex-col flex-1 transition-all duration-300"
-        style={{ marginLeft: sidebarOpen ? "256px" : "80px" }}
+        className="flex flex-col flex-1 transition-all duration-300 w-full"
+        style={{
+          marginLeft: window.innerWidth >= 1024 ? (sidebarOpen ? "256px" : "80px") : "0"
+        }}
       >
         {/* ---------------------------------------------------------
            FIXED TOP NAVBAR
         --------------------------------------------------------- */}
         <header
-          className="fixed top-0 right-0 z-20 transition-all duration-300"
-          style={{ left: sidebarOpen ? "256px" : "80px" }}
+          className="fixed top-0 right-0 z-20 transition-all duration-300 w-full lg:w-auto"
+          style={{
+            left: window.innerWidth >= 1024 ? (sidebarOpen ? "256px" : "80px") : "0"
+          }}
         >
-          <TopNavbar />
+          <TopNavbar
+            onMobileMenuClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            mobileMenuOpen={mobileMenuOpen}
+          />
         </header>
 
         {/* ---------------------------------------------------------
            PAGE CONTENT
         --------------------------------------------------------- */}
-        <main className="pt-20 px-6 overflow-auto">
+        <main className="pt-20 px-3 sm:px-4 md:px-6 pb-6 overflow-auto flex-1">
           {children}
         </main>
 

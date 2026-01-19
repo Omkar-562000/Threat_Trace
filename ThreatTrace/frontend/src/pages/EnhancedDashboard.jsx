@@ -124,7 +124,7 @@ export default function EnhancedDashboard() {
   // UI RENDER
   // ============================================================
   return (
-    <div className="min-h-screen bg-cyberDark text-white p-6 relative overflow-x-hidden">
+    <div className="min-h-screen bg-cyberDark text-white p-3 sm:p-4 md:p-6 relative overflow-x-hidden">
       {/* Toast */}
       {toast && (
         <Toast
@@ -135,24 +135,24 @@ export default function EnhancedDashboard() {
       )}
 
       {/* Animated Background */}
-      <div className="absolute w-[600px] h-[600px] bg-purple-600/10 blur-[120px] rounded-full top-0 left-0 -translate-x-1/2 -translate-y-1/2 animate-pulse"></div>
-      <div className="absolute w-[500px] h-[500px] bg-cyan-600/10 blur-[120px] rounded-full bottom-0 right-0 translate-x-1/2 translate-y-1/2 animate-pulse" style={{ animationDelay: '1s' }}></div>
+      <div className="absolute w-[300px] h-[300px] sm:w-[400px] sm:h-[400px] md:w-[600px] md:h-[600px] bg-purple-600/10 blur-[80px] md:blur-[120px] rounded-full top-0 left-0 -translate-x-1/2 -translate-y-1/2 animate-pulse"></div>
+      <div className="absolute w-[250px] h-[250px] sm:w-[350px] sm:h-[350px] md:w-[500px] md:h-[500px] bg-cyan-600/10 blur-[80px] md:blur-[120px] rounded-full bottom-0 right-0 translate-x-1/2 translate-y-1/2 animate-pulse" style={{ animationDelay: '1s' }}></div>
 
       {/* Header */}
-      <div className="mb-8 relative z-10">
-        <h1 className="text-5xl font-bold mb-2 bg-gradient-to-r from-purple-400 via-pink-400 to-cyan-400 bg-clip-text text-transparent">
+      <div className="mb-6 sm:mb-8 relative z-10">
+        <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold mb-2 bg-gradient-to-r from-purple-400 via-pink-400 to-cyan-400 bg-clip-text text-transparent">
           ThreatTrace Command Center
         </h1>
-        <p className="text-gray-400 text-sm">Real-time Global Threat Intelligence Dashboard</p>
+        <p className="text-gray-400 text-xs sm:text-sm">Real-time Global Threat Intelligence Dashboard</p>
       </div>
 
       {/* Quick Stats Cards - Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6 relative z-10">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-4 sm:mb-6 relative z-10">
         <StatCard
           title="Total Threats Today"
           value={dashboardStats.total_threats_today?.toLocaleString() || "0"}
           subtitle="Across all severity levels"
-          icon={<FireIcon className="w-8 h-8" />}
+          icon={<FireIcon className="w-6 h-6 sm:w-8 sm:h-8" />}
           color="red"
           trend={{ type: "up", value: "+12.5% from yesterday" }}
         />
@@ -160,7 +160,7 @@ export default function EnhancedDashboard() {
           title="Blocked Attacks"
           value={dashboardStats.blocked_attacks?.toLocaleString() || "0"}
           subtitle="Successfully mitigated"
-          icon={<ShieldCheckIcon className="w-8 h-8" />}
+          icon={<ShieldCheckIcon className="w-6 h-6 sm:w-8 sm:h-8" />}
           color="green"
           trend={{ type: "up", value: "+8.3% effectiveness" }}
         />
@@ -168,7 +168,7 @@ export default function EnhancedDashboard() {
           title="Active Threats"
           value={dashboardStats.active_threats || "0"}
           subtitle="Requires immediate attention"
-          icon={<ExclamationTriangleIcon className="w-8 h-8" />}
+          icon={<ExclamationTriangleIcon className="w-6 h-6 sm:w-8 sm:h-8" />}
           color="yellow"
           trend={{ type: "down", value: "-3 from last hour" }}
         />
@@ -176,38 +176,38 @@ export default function EnhancedDashboard() {
           title="Global Coverage"
           value={dashboardStats.countries_affected || "0"}
           subtitle="Countries affected"
-          icon={<GlobeAltIcon className="w-8 h-8" />}
+          icon={<GlobeAltIcon className="w-6 h-6 sm:w-8 sm:h-8" />}
           color="cyan"
         />
       </div>
 
       {/* Bento Grid Layout */}
-      <div className="grid grid-cols-12 gap-6 relative z-10">
+      <div className="grid grid-cols-12 gap-3 sm:gap-4 md:gap-6 relative z-10">
         
         {/* 3D GLOBE - Large Panel (Spans 8 columns) */}
-        <div className="col-span-12 lg:col-span-8 glass-cyber p-6 border border-white/20 rounded-2xl shadow-2xl">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-2xl font-semibold text-cyan-400 flex items-center gap-2">
-              <GlobeAltIcon className="w-7 h-7" />
+        <div className="col-span-12 lg:col-span-8 glass-cyber p-4 sm:p-5 md:p-6 border border-white/20 rounded-xl md:rounded-2xl shadow-2xl">
+          <div className="flex items-center justify-between mb-3 sm:mb-4">
+            <h2 className="text-lg sm:text-xl md:text-2xl font-semibold text-cyan-400 flex items-center gap-2">
+              <GlobeAltIcon className="w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7" />
               Global Threat Map
             </h2>
             <div className="text-xs text-gray-400 flex items-center gap-2">
               <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-              Live
+              <span className="hidden sm:inline">Live</span>
             </div>
           </div>
-          <div className="h-[600px] rounded-xl overflow-hidden">
+          <div className="h-[300px] sm:h-[400px] md:h-[500px] lg:h-[600px] rounded-xl overflow-hidden">
             <GlobeVisualization threats={threatLocations} />
           </div>
         </div>
 
         {/* TOP THREATS LIST - Side Panel (Spans 4 columns) */}
-        <div className="col-span-12 lg:col-span-4 glass-cyber p-6 border border-white/20 rounded-2xl shadow-2xl">
-          <h2 className="text-xl font-semibold text-red-400 mb-4 flex items-center gap-2">
-            <FireIcon className="w-6 h-6" />
+        <div className="col-span-12 lg:col-span-4 glass-cyber p-4 sm:p-5 md:p-6 border border-white/20 rounded-xl md:rounded-2xl shadow-2xl">
+          <h2 className="text-lg sm:text-xl font-semibold text-red-400 mb-3 sm:mb-4 flex items-center gap-2">
+            <FireIcon className="w-5 h-5 sm:w-6 sm:h-6" />
             Active Threats
           </h2>
-          <div className="space-y-3 max-h-[560px] overflow-y-auto pr-2 custom-scrollbar">
+          <div className="space-y-3 max-h-[300px] sm:max-h-[400px] lg:max-h-[560px] overflow-y-auto pr-2 custom-scrollbar">
             {topThreats.map((threat, idx) => (
               <div
                 key={idx}
@@ -246,79 +246,79 @@ export default function EnhancedDashboard() {
         </div>
 
         {/* THREAT TRENDS CHART - Wide Panel */}
-        <div className="col-span-12 lg:col-span-8 glass-cyber p-6 border border-white/20 rounded-2xl shadow-2xl">
-          <h2 className="text-xl font-semibold text-purple-400 mb-4 flex items-center gap-2">
-            <ChartBarIcon className="w-6 h-6" />
+        <div className="col-span-12 lg:col-span-8 glass-cyber p-4 sm:p-5 md:p-6 border border-white/20 rounded-xl md:rounded-2xl shadow-2xl">
+          <h2 className="text-lg sm:text-xl font-semibold text-purple-400 mb-3 sm:mb-4 flex items-center gap-2">
+            <ChartBarIcon className="w-5 h-5 sm:w-6 sm:h-6" />
             24-Hour Threat Trends
           </h2>
-          <div className="h-[350px]">
+          <div className="h-[250px] sm:h-[300px] md:h-[350px]">
             <ThreatTrendsChart data={threatTrends} />
           </div>
         </div>
 
         {/* SEVERITY DISTRIBUTION - Small Panel */}
-        <div className="col-span-12 lg:col-span-4 glass-cyber p-6 border border-white/20 rounded-2xl shadow-2xl">
-          <h2 className="text-xl font-semibold text-yellow-400 mb-4">
+        <div className="col-span-12 lg:col-span-4 glass-cyber p-4 sm:p-5 md:p-6 border border-white/20 rounded-xl md:rounded-2xl shadow-2xl">
+          <h2 className="text-lg sm:text-xl font-semibold text-yellow-400 mb-3 sm:mb-4">
             Severity Breakdown
           </h2>
-          <div className="h-[350px]">
+          <div className="h-[250px] sm:h-[300px] md:h-[350px]">
             <SeverityChart data={severityStats} />
           </div>
         </div>
 
         {/* THREAT TYPES CHART - Medium Panel */}
-        <div className="col-span-12 lg:col-span-6 glass-cyber p-6 border border-white/20 rounded-2xl shadow-2xl">
-          <h2 className="text-xl font-semibold text-pink-400 mb-4">
+        <div className="col-span-12 lg:col-span-6 glass-cyber p-4 sm:p-5 md:p-6 border border-white/20 rounded-xl md:rounded-2xl shadow-2xl">
+          <h2 className="text-lg sm:text-xl font-semibold text-pink-400 mb-3 sm:mb-4">
             Attack Types Distribution
           </h2>
-          <div className="h-[400px]">
+          <div className="h-[300px] sm:h-[350px] md:h-[400px]">
             <ThreatTypesChart data={threatTypes} />
           </div>
         </div>
 
         {/* SYSTEM STATS - Info Panel */}
-        <div className="col-span-12 lg:col-span-6 glass-cyber p-6 border border-white/20 rounded-2xl shadow-2xl">
-          <h2 className="text-xl font-semibold text-cyan-400 mb-4">
+        <div className="col-span-12 lg:col-span-6 glass-cyber p-4 sm:p-5 md:p-6 border border-white/20 rounded-xl md:rounded-2xl shadow-2xl">
+          <h2 className="text-lg sm:text-xl font-semibold text-cyan-400 mb-3 sm:mb-4">
             System Performance
           </h2>
-          <div className="space-y-4">
-            <div className="flex items-center justify-between p-4 bg-white/5 rounded-xl border border-white/10">
+          <div className="space-y-3 sm:space-y-4">
+            <div className="flex items-center justify-between p-3 sm:p-4 bg-white/5 rounded-xl border border-white/10">
               <div>
-                <div className="text-sm text-gray-400 mb-1">Files Scanned</div>
-                <div className="text-2xl font-bold text-white">{dashboardStats.files_scanned?.toLocaleString() || "0"}</div>
+                <div className="text-xs sm:text-sm text-gray-400 mb-1">Files Scanned</div>
+                <div className="text-xl sm:text-2xl font-bold text-white">{dashboardStats.files_scanned?.toLocaleString() || "0"}</div>
               </div>
-              <div className="w-16 h-16 bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-full flex items-center justify-center">
-                <ChartBarIcon className="w-8 h-8 text-purple-400" />
+              <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-full flex items-center justify-center">
+                <ChartBarIcon className="w-6 h-6 sm:w-8 sm:h-8 text-purple-400" />
               </div>
             </div>
 
-            <div className="flex items-center justify-between p-4 bg-white/5 rounded-xl border border-white/10">
+            <div className="flex items-center justify-between p-3 sm:p-4 bg-white/5 rounded-xl border border-white/10">
               <div>
-                <div className="text-sm text-gray-400 mb-1">Integrity Checks</div>
-                <div className="text-2xl font-bold text-white">{dashboardStats.integrity_checks?.toLocaleString() || "0"}</div>
+                <div className="text-xs sm:text-sm text-gray-400 mb-1">Integrity Checks</div>
+                <div className="text-xl sm:text-2xl font-bold text-white">{dashboardStats.integrity_checks?.toLocaleString() || "0"}</div>
               </div>
-              <div className="w-16 h-16 bg-gradient-to-br from-cyan-500/20 to-blue-500/20 rounded-full flex items-center justify-center">
-                <ShieldCheckIcon className="w-8 h-8 text-cyan-400" />
+              <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gradient-to-br from-cyan-500/20 to-blue-500/20 rounded-full flex items-center justify-center">
+                <ShieldCheckIcon className="w-6 h-6 sm:w-8 sm:h-8 text-cyan-400" />
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="p-4 bg-white/5 rounded-xl border border-white/10 text-center">
-                <div className="text-sm text-gray-400 mb-2">Avg Response</div>
-                <div className="text-xl font-bold text-green-400">{dashboardStats.avg_response_time || "N/A"}</div>
+            <div className="grid grid-cols-2 gap-3 sm:gap-4">
+              <div className="p-3 sm:p-4 bg-white/5 rounded-xl border border-white/10 text-center">
+                <div className="text-xs sm:text-sm text-gray-400 mb-2">Avg Response</div>
+                <div className="text-lg sm:text-xl font-bold text-green-400">{dashboardStats.avg_response_time || "N/A"}</div>
               </div>
-              <div className="p-4 bg-white/5 rounded-xl border border-white/10 text-center">
-                <div className="text-sm text-gray-400 mb-2">Uptime</div>
-                <div className="text-xl font-bold text-green-400">{dashboardStats.uptime || "N/A"}</div>
+              <div className="p-3 sm:p-4 bg-white/5 rounded-xl border border-white/10 text-center">
+                <div className="text-xs sm:text-sm text-gray-400 mb-2">Uptime</div>
+                <div className="text-lg sm:text-xl font-bold text-green-400">{dashboardStats.uptime || "N/A"}</div>
               </div>
             </div>
 
             {/* Real-time status indicator */}
-            <div className="p-4 bg-gradient-to-r from-green-500/10 to-cyan-500/10 rounded-xl border border-green-500/30">
+            <div className="p-3 sm:p-4 bg-gradient-to-r from-green-500/10 to-cyan-500/10 rounded-xl border border-green-500/30">
               <div className="flex items-center gap-3">
                 <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
                 <div>
-                  <div className="text-sm font-semibold text-green-400">All Systems Operational</div>
+                  <div className="text-xs sm:text-sm font-semibold text-green-400">All Systems Operational</div>
                   <div className="text-xs text-gray-400">Last updated: Just now</div>
                 </div>
               </div>
@@ -328,9 +328,9 @@ export default function EnhancedDashboard() {
       </div>
 
       {/* Footer Info */}
-      <div className="mt-8 text-center text-xs text-gray-500 relative z-10">
+      <div className="mt-6 sm:mt-8 text-center text-xs text-gray-500 relative z-10 px-2">
         <p>ThreatTrace © 2026 - AI-Powered Security Monitoring Platform</p>
-        <p className="mt-1">Data refreshes every 30 seconds | Real-time threat detection active</p>
+        <p className="mt-1 hidden sm:block">Data refreshes every 30 seconds | Real-time threat detection active</p>
       </div>
     </div>
   );
