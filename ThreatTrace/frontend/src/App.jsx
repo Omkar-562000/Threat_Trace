@@ -15,6 +15,7 @@ import ProtectedRoute from "./utils/ProtectedRoute";
 import Alerts from "./pages/Alerts";
 import Audit from "./pages/Audit";
 import Dashboard from "./pages/Dashboard";
+import EnhancedDashboard from "./pages/EnhancedDashboard";
 import Ransomware from "./pages/Ransomware";
 import Reports from "./pages/Reports";
 import Settings from "./pages/Settings";
@@ -36,7 +37,7 @@ export default function App() {
           element={
             <ProtectedRoute>
               <DashboardLayout>
-                <Dashboard />
+                <EnhancedDashboard />
               </DashboardLayout>
             </ProtectedRoute>
           }

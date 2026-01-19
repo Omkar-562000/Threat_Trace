@@ -103,6 +103,7 @@ from routes.audit_routes import audit_bp
 from routes.logs_routes import logs_bp
 from routes.alerts_routes import alerts_bp
 from routes.reports_routes import reports_bp
+from routes.dashboard_routes import dashboard_bp
 
 # Scheduler (optional)
 try:
@@ -122,6 +123,7 @@ app.register_blueprint(audit_bp, url_prefix="/api/audit")
 app.register_blueprint(logs_bp, url_prefix="/api/logs")
 app.register_blueprint(alerts_bp, url_prefix="/api/alerts")
 app.register_blueprint(reports_bp, url_prefix="/api/reports")
+app.register_blueprint(dashboard_bp, url_prefix="/api/dashboard")
 
 if scheduler_bp:
     app.register_blueprint(scheduler_bp, url_prefix="/api/scheduler")
