@@ -1,6 +1,7 @@
 // frontend/src/pages/Audit.jsx
 import { useCallback, useEffect, useState } from "react";
 import {
+  exportAuditCSV,
   getAuditHistory,
   schedulerRunNow,
   schedulerStart,
@@ -126,10 +127,10 @@ export default function Audit() {
         </div>
       </div>
 
-      {/* Scheduler – CORPORATE ONLY */}
-      {hasRole(["corporate"]) && (
+      {/* Scheduler – TECHNICAL ONLY */}
+      {hasRole(["technical"]) ? (
         <div className="glass-cyber p-4 mt-6">
-          <h3 className="font-semibold mb-2">Scheduler Controls</h3>
+          <h3 className="font-semibold mb-2">🔧 Scheduler Controls (Technical)</h3>
 
           <div className="flex items-center gap-3">
             <input
@@ -152,23 +153,75 @@ export default function Audit() {
             </button>
 
             <span className="text-sm">
-              {schedRunning ? "Running" : "Stopped"}
+              {schedRunning ? "⚡ Running" : "⏸️ Stopped"}
             </span>
+          </div>
+        </div>
+      ) : (
+        <div className="glass-cyber p-4 mt-6 border-2 border-yellow-500/30 bg-yellow-500/5">
+          <div className="flex items-center gap-3">
+            <span className="text-3xl">🔒</span>
+            <div>
+              <h3 className="font-semibold text-yellow-400">Scheduler Controls Locked</h3>
+              <p className="text-sm text-gray-400 mt-1">
+                Upgrade to <span className="text-cyberPurple font-semibold">Technical</span> plan to access automated scheduled scans
+              </p>
+            </div>
           </div>
         </div>
       )}
 
       {/* History */}
       <div className="glass-cyber p-4 mt-6">
-        <h3 className="font-semibold mb-2">Audit History</h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-semibold">Audit History</h3>
+          
+          {hasRole(["corporate", "technical"]) && history.length > 0 && (
+            <button
+              className="cyber-btn text-sm px-3 py-1"
+              onClick={async () => {
+                try {
+                  await exportAuditCSV(history[0].file_path);
+                  pushToast("CSV export successful", "success");
+                } catch (err) {
+                  pushToast("Export failed", "error");
+                }
+              }}
+            >
+              📥 Export Latest CSV
+            </button>
+          )}
+        </div>
 
-        <ul className="space-y-1">
-          {history.map((h, i) => (
-            <li key={i}>
-              {h.file_path} — {fmt(h.last_verified)}
-            </li>
-          ))}
+        <ul className="space-y-2">
+          {history.length === 0 ? (
+            <li className="text-gray-400 text-sm">No audit history yet</li>
+          ) : (
+            history.map((h, i) => (
+              <li key={i} className="flex items-center justify-between p-2 bg-white/5 rounded hover:bg-white/10">
+                <div>
+                  <span className="text-cyberBlue">{h.file_path}</span>
+                  <span className="text-gray-400 text-sm ml-3">— {fmt(h.last_verified)}</span>
+                </div>
+                {h.tampered && (
+                  <span className="text-red-400 text-xs font-semibold px-2 py-1 bg-red-500/20 rounded">
+                    ⚠️ TAMPERED
+                  </span>
+                )}
+              </li>
+            ))
+          )}
         </ul>
+
+        {!hasRole(["corporate", "technical"]) && history.length > 0 && (
+          <div className="mt-4 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded text-sm">
+            <p className="text-yellow-400 font-semibold">🔒 Export Feature Locked</p>
+            <p className="text-gray-400 mt-1">
+              Upgrade to <span className="text-cyberPurple font-semibold">Corporate</span> or{" "}
+              <span className="text-cyberPurple font-semibold">Technical</span> to export audit reports
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

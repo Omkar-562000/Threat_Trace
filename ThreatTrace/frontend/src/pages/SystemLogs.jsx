@@ -8,6 +8,7 @@ import {
   getSystemLogs,
 } from "../services/systemLogsService";
 import socket from "../utils/socket";
+import { hasRole } from "../utils/role";
 
 export default function SystemLogs() {
   /* ===============================
@@ -349,12 +350,22 @@ export default function SystemLogs() {
         </div>
 
         <div className="mt-6 flex flex-col gap-2">
-          <button className="cyber-btn" onClick={exportCSV}>
-            Export CSV
-          </button>
-          <button className="cyber-btn" onClick={exportPDF}>
-            Export PDF
-          </button>
+          <h4 className="text-sm font-semibold text-gray-300 mb-2">Export Logs</h4>
+          {hasRole(["corporate", "technical"]) ? (
+            <>
+              <button className="cyber-btn" onClick={exportCSV}>
+                📥 Export CSV
+              </button>
+              <button className="cyber-btn" onClick={exportPDF}>
+                📄 Export PDF
+              </button>
+            </>
+          ) : (
+            <div className="p-3 bg-yellow-500/10 border border-yellow-500/30 rounded text-sm">
+              <p className="text-yellow-400 font-semibold">🔒 Export Locked</p>
+              <p className="text-gray-400 mt-1">Upgrade to Corporate or Technical</p>
+            </div>
+          )}
         </div>
       </aside>
 

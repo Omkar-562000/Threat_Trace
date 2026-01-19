@@ -163,9 +163,10 @@ def audit_report():
 
 
 # ============================================================
-# 5️⃣ EXPORT CSV
+# 5️⃣ EXPORT CSV (Corporate & Technical Only)
 # ============================================================
 @audit_bp.route("/export/csv", methods=["GET"])
+@role_required("corporate", "technical")
 def export_csv():
     try:
         file_path = request.args.get("file_path")
@@ -215,11 +216,3 @@ def export_csv():
 @audit_bp.route("/test", methods=["GET"])
 def test():
     return jsonify({"status": "success", "message": "Audit module active"}), 200
-
-@audit_bp.route("/export/csv", methods=["GET"])
-@role_required("enterprise", "corporate")
-def export_csv():
-
-@audit_bp.route("/export/pdf", methods=["GET"])
-@role_required("enterprise", "corporate")
-def export_pdf():

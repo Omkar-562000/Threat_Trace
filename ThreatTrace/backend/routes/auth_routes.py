@@ -34,9 +34,15 @@ def register():
         name = data.get("name")
         email = data.get("email", "").lower()
         password = data.get("password")
+        role = data.get("role", "personal").lower()
 
         if not name or not email or not password:
             return jsonify({"status": "error", "message": "All fields are required"}), 400
+
+        # Validate role
+        valid_roles = ["personal", "corporate", "technical"]
+        if role not in valid_roles:
+            return jsonify({"status": "error", "message": "Invalid role selected"}), 400
 
         db = current_app.config["DB"]
         users = db["users"]
@@ -49,11 +55,11 @@ def register():
         hashed_pw = bcrypt.generate_password_hash(password).decode("utf-8")
 
         users.insert_one({
-        "name": name,
-        "email": email,
-        "password": hashed_pw,
-        "role": "personal",   # default role
-        "created_at": datetime.utcnow()
+            "name": name,
+            "email": email,
+            "password": hashed_pw,
+            "role": role,
+            "created_at": datetime.utcnow()
         })
 
         return jsonify({"status": "success", "message": "Account created successfully"}), 201

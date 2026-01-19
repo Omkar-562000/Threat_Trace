@@ -62,11 +62,15 @@ export async function getAuditReport(file_path) {
 }
 
 /* ------------------------------------------------------
-   EXPORT CSV
+   EXPORT CSV (Corporate & Technical Only)
 ------------------------------------------------------ */
 export async function exportAuditCSV(file_path) {
+  const token = localStorage.getItem("token");
   const res = await fetch(
-    `${AUDIT_API}/export/csv?file_path=${encodeURIComponent(file_path)}`
+    `${AUDIT_API}/export/csv?file_path=${encodeURIComponent(file_path)}`,
+    {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    }
   );
 
   if (!res.ok) throw new Error("CSV export failed");
@@ -84,11 +88,15 @@ export async function exportAuditCSV(file_path) {
 }
 
 /* ------------------------------------------------------
-   EXPORT PDF
+   EXPORT PDF (Corporate & Technical Only)
 ------------------------------------------------------ */
 export async function exportAuditPDF(file_path) {
+  const token = localStorage.getItem("token");
   const res = await fetch(
-    `${AUDIT_API}/export/pdf?file_path=${encodeURIComponent(file_path)}`
+    `${AUDIT_API}/export/pdf?file_path=${encodeURIComponent(file_path)}`,
+    {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    }
   );
 
   if (!res.ok) throw new Error("PDF export failed");
@@ -114,30 +122,42 @@ export async function schedulerStatus() {
 }
 
 /* ------------------------------------------------------
-   START SCHEDULER (scheduler_routes.py /start)
+   START SCHEDULER (scheduler_routes.py /start) - Technical Only
 ------------------------------------------------------ */
 export async function schedulerStart(intervalSeconds = 300) {
+  const token = localStorage.getItem("token");
   const res = await fetch(`${SCHED_API}/start`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(token && { Authorization: `Bearer ${token}` }),
+    },
     body: JSON.stringify({ interval_seconds: intervalSeconds }),
   });
   return parseResponse(res);
 }
 
 /* ------------------------------------------------------
-   STOP SCHEDULER (scheduler_routes.py /stop)
+   STOP SCHEDULER (scheduler_routes.py /stop) - Technical Only
 ------------------------------------------------------ */
 export async function schedulerStop() {
-  const res = await fetch(`${SCHED_API}/stop`, { method: "POST" });
+  const token = localStorage.getItem("token");
+  const res = await fetch(`${SCHED_API}/stop`, {
+    method: "POST",
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
   return parseResponse(res);
 }
 
 /* ------------------------------------------------------
-   RUN IMMEDIATE CHECK (scheduler_routes.py /run-now)
+   RUN IMMEDIATE CHECK (scheduler_routes.py /run-now) - Technical Only
 ------------------------------------------------------ */
 export async function schedulerRunNow() {
-  const res = await fetch(`${SCHED_API}/run-now`, { method: "POST" });
+  const token = localStorage.getItem("token");
+  const res = await fetch(`${SCHED_API}/run-now`, {
+    method: "POST",
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
   return parseResponse(res);
 }
 

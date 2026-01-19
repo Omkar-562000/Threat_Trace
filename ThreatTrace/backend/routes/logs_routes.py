@@ -165,9 +165,10 @@ def ingest_log():
 
 
 # ---------------------------------------------------------
-# 4️⃣ EXPORT LOGS (CSV / PDF)
+# 4️⃣ EXPORT LOGS (CSV / PDF) - Corporate & Technical Only
 # ---------------------------------------------------------
 @logs_bp.route("/export", methods=["GET"])
+@role_required("corporate", "technical")
 def export_logs():
     try:
         fmt = request.args.get("format", "csv")
@@ -256,7 +257,3 @@ def export_logs():
     except Exception as e:
         print("export_logs error:", e)
         return jsonify({"status": "error", "message": str(e)}), 500
-
-@logs_bp.route("/export", methods=["GET"])
-@role_required("enterprise", "corporate")
-def export_logs():

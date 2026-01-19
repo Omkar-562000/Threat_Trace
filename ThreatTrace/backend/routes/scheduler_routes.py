@@ -6,6 +6,7 @@ from utils.role_guard import role_required
 scheduler_bp = Blueprint("scheduler_bp", __name__)
 
 @scheduler_bp.route("/start", methods=["POST"])
+@role_required("technical")
 def start_scheduler():
     try:
         data = request.get_json() or {}
@@ -17,6 +18,7 @@ def start_scheduler():
         return jsonify({"status":"error","message":str(e)}), 500
 
 @scheduler_bp.route("/stop", methods=["POST"])
+@role_required("technical")
 def stop():
     try:
         ok = stop_scheduler(current_app)
@@ -28,6 +30,7 @@ def stop():
         return jsonify({"status":"error","message":str(e)}), 500
 
 @scheduler_bp.route("/run-now", methods=["POST"])
+@role_required("technical")
 def trigger_now():
     try:
         ok = run_now(current_app)
@@ -46,15 +49,3 @@ def status():
     except Exception as e:
         print("status error:", e)
         return jsonify({"status":"error","message":str(e)}), 500
-
-@scheduler_bp.route("/start", methods=["POST"])
-@role_required("corporate")
-def start_scheduler():
-
-@scheduler_bp.route("/stop", methods=["POST"])
-@role_required("corporate")
-def stop():
-
-@scheduler_bp.route("/run-now", methods=["POST"])
-@role_required("corporate")
-def trigger_now():

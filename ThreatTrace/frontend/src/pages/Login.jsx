@@ -68,11 +68,20 @@ export default function Login() {
           </div>
 
           <div>
-            <label className="text-sm text-gray-300">Password</label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-sm text-gray-300">Password</label>
+              <button
+                type="button"
+                onClick={() => navigate("/forgot-password")}
+                className="text-xs text-cyberPurple hover:underline"
+              >
+                Forgot Password?
+              </button>
+            </div>
             <input
               type="password"
               name="password"
-              className="cyber-input mt-1"
+              className="cyber-input"
               value={formData.password}
               onChange={handleChange}
               required
@@ -91,6 +100,19 @@ export default function Login() {
             {loading ? "Logging in..." : "Login"}
           </button>
         </form>
+
+        {/* Redirect Link */}
+        <div className="mt-6 text-center">
+          <p className="text-sm text-gray-300">
+            Don't have an account?{" "}
+            <button
+              onClick={() => navigate("/signup")}
+              className="text-cyberPurple hover:underline"
+            >
+              Sign Up
+            </button>
+          </p>
+        </div>
       </div>
     </div>
   );

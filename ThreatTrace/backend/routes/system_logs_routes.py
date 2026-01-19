@@ -5,6 +5,7 @@ import io
 import csv
 import os
 import uuid
+from utils.role_guard import role_required
 
 # If you want PDF export, install reportlab: pip install reportlab
 try:
@@ -101,8 +102,9 @@ def ingest_logs():
     return jsonify({"status": "success", "saved": saved}), 201
 
 
-# GET: export (csv or pdf)
+# GET: export (csv or pdf) - Corporate & Technical Only
 @system_logs_bp.route("/export", methods=["GET"])
+@role_required("corporate", "technical")
 def export_logs():
     db = current_app.config["DB"]
     collection = db["system_logs"]

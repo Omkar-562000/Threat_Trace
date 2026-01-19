@@ -9,6 +9,7 @@ export default function Signup() {
         name: "",
         email: "",
         password: "",
+        role: "personal",
     });
 
     const [loading, setLoading] = useState(false);
@@ -99,6 +100,22 @@ export default function Signup() {
                             className="cyber-input mt-1"
                             required
                         />
+                    </div>
+
+                    {/* Role Selection */}
+                    <div>
+                        <label className="text-sm text-gray-300">Account Type</label>
+                        <select
+                            name="role"
+                            value={formData.role}
+                            onChange={handleChange}
+                            className="cyber-input mt-1"
+                            required
+                        >
+                            <option value="personal">Personal - Individual User</option>
+                            <option value="corporate">Corporate - Big Firm/Enterprise</option>
+                            <option value="technical">Technical - IT/Security Professional</option>
+                        </select>
                     </div>
 
                     {/* Messages */}
