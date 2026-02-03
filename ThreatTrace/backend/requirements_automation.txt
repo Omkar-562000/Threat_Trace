@@ -1,0 +1,13 @@
+# ThreatTrace Automation Components - Additional Requirements
+# ============================================================
+# Install these in addition to the main requirements.txt
+#
+# Installation:
+#   pip install -r requirements_automation.txt
+
+# Windows Event Log collection (Windows only)
+pywin32>=305; sys_platform == 'win32'
+
+# All other dependencies are already in main requirements.txt:
+# - requests (for API calls)
+# - python-dotenv (for config)

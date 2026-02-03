@@ -6,7 +6,7 @@ Real-time threat analytics and geographic threat data for dashboard
 visualization including 3D globe and charts.
 """
 
-from flask import Blueprint, jsonify, current_app
+from flask import Blueprint, jsonify, current_app, request
 from datetime import datetime, timedelta
 import random
 
@@ -430,3 +430,52 @@ def get_top_threats():
         "status": "success",
         "threats": top_threats
     })
+
+
+# ============================================================
+# BROADCAST ENDPOINT (For automation to trigger WebSocket updates)
+# ============================================================
+@dashboard_bp.route("/broadcast", methods=["POST"])
+def broadcast_event():
+    """
+    Receive events from automation scripts and broadcast via WebSocket
+    
+    Expected payload:
+    {
+        "event": "stats_update" | "threat_location" | "activity_update" | "scan_progress",
+        "data": { ... event-specific data ... }
+    }
+    """
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({"status": "error", "message": "No data provided"}), 400
+        
+        event_type = data.get("event")
+        payload = data.get("data", {})
+        
+        if not event_type:
+            return jsonify({"status": "error", "message": "Event type required"}), 400
+        
+        # Get SocketIO instance
+        socketio = current_app.config.get("SOCKETIO")
+        
+        if not socketio:
+            return jsonify({"status": "error", "message": "WebSocket not configured"}), 500
+        
+        # Broadcast event to all connected clients
+        socketio.emit(event_type, payload)
+        
+        return jsonify({
+            "status": "success",
+            "event": event_type,
+            "broadcasted": True
+        }), 200
+        
+    except Exception as e:
+        print(f"Broadcast error: {e}")
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 500

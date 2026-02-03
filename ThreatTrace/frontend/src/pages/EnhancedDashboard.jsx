@@ -1,12 +1,22 @@
-// src/pages/EnhancedDashboard.jsx - Enhanced Dashboard with 3D Globe & Analytics
+// src/pages/EnhancedDashboard.jsx - Real-Time Enhanced Dashboard
 import { useEffect, useState } from "react";
 import axios from "axios";
-import { ShieldCheckIcon, FireIcon, GlobeAltIcon, ChartBarIcon, ExclamationTriangleIcon, ClockIcon } from "@heroicons/react/24/outline";
+import { 
+  ShieldCheckIcon, 
+  FireIcon, 
+  GlobeAltIcon, 
+  ChartBarIcon, 
+  ExclamationTriangleIcon, 
+  ClockIcon,
+  DocumentMagnifyingGlassIcon,
+  LockClosedIcon
+} from "@heroicons/react/24/outline";
 import GlobeVisualization from "../components/GlobeVisualization";
 import ThreatTrendsChart from "../components/ThreatTrendsChart";
 import ThreatTypesChart from "../components/ThreatTypesChart";
 import SeverityChart from "../components/SeverityChart";
-import StatCard from "../components/StatCard";
+import AnimatedStatCard from "../components/AnimatedStatCard";
+import LiveActivityFeed from "../components/LiveActivityFeed";
 import Toast from "../components/ui/Toast";
 import socket from "../utils/socket";
 
@@ -19,8 +29,16 @@ export default function EnhancedDashboard() {
   const [threatTrends, setThreatTrends] = useState([]);
   const [threatTypes, setThreatTypes] = useState([]);
   const [severityStats, setSeverityStats] = useState({});
-  const [dashboardStats, setDashboardStats] = useState({});
+  const [dashboardStats, setDashboardStats] = useState({
+    total_threats_today: 0,
+    blocked_attacks: 0,
+    active_threats: 0,
+    files_scanned: 0,
+    integrity_checks: 0,
+    countries_affected: 0,
+  });
   const [topThreats, setTopThreats] = useState([]);
+  const [activityFeed, setActivityFeed] = useState([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
 
@@ -58,38 +76,139 @@ export default function EnhancedDashboard() {
   };
 
   // ============================================================
-  // REAL-TIME UPDATES
+  // REAL-TIME WEBSOCKET UPDATES
   // ============================================================
   useEffect(() => {
     // Initial fetch
     fetchAllData();
 
-    // Auto-refresh every 30 seconds
+    // Auto-refresh every 30 seconds (fallback)
     const refreshInterval = setInterval(() => {
       fetchAllData();
     }, 30000);
 
-    // Real-time alerts
-    const onAlert = (msg) => {
+    // ========== WebSocket Event Listeners ==========
+
+    // 1. Real-time stats update
+    const handleStatsUpdate = (data) => {
+      console.log("[WebSocket] Stats update:", data);
+      setDashboardStats(prev => ({
+        ...prev,
+        ...data
+      }));
+    };
+
+    // 2. New threat location
+    const handleThreatLocation = (data) => {
+      console.log("[WebSocket] New threat location:", data);
+      setThreatLocations(prev => {
+        // Add new location or update existing
+        const existing = prev.find(l => l.lat === data.lat && l.lng === data.lng);
+        if (existing) {
+          return prev.map(l => 
+            l.lat === data.lat && l.lng === data.lng 
+              ? { ...l, count: l.count + 1 }
+              : l
+          );
+        }
+        return [...prev, { ...data, count: 1 }];
+      });
+    };
+
+    // 3. Activity feed update
+    const handleActivityUpdate = (data) => {
+      console.log("[WebSocket] Activity update:", data);
+      setActivityFeed(prev => [data, ...prev].slice(0, 50));
+    };
+
+    // 4. Scan progress
+    const handleScanProgress = (data) => {
+      console.log("[WebSocket] Scan progress:", data);
+      // Update activity feed with scan progress
+      setActivityFeed(prev => [{
+        id: `scan-${Date.now()}`,
+        timestamp: new Date().toISOString(),
+        type: 'scan',
+        severity: 'info',
+        message: `Scanning: ${data.file || 'Unknown file'}`,
+        details: `${data.current} / ${data.total}`,
+        source: data.type || 'Auto Scanner'
+      }, ...prev].slice(0, 50));
+    };
+
+    // 5. General alerts (existing)
+    const handleAlert = (msg) => {
+      console.log("[WebSocket] Alert:", msg);
+      
       setToast({
         message: msg?.message || "New Security Alert!",
         severity: msg?.severity || "warn",
       });
-      setTimeout(() => setToast(null), 3500);
       
-      // Refresh data on new alert
-      fetchAllData();
+      // Add to activity feed
+      setActivityFeed(prev => [{
+        id: `alert-${Date.now()}`,
+        timestamp: new Date().toISOString(),
+        type: msg?.source || 'alert',
+        severity: msg?.severity || 'medium',
+        message: msg?.message || 'Security Alert',
+        details: msg?.details || null,
+        source: msg?.source || 'System'
+      }, ...prev].slice(0, 50));
+      
+      // Refresh data
+      setTimeout(() => fetchAllData(), 1000);
     };
 
-    socket.on("new_alert", onAlert);
-    socket.on("tamper_alert", onAlert);
-    socket.on("ransomware_alert", onAlert);
+    // 6. System log events
+    const handleSystemLog = (log) => {
+      console.log("[WebSocket] System log:", log);
+      
+      // Add important logs to activity feed
+      if (log.level === 'ERROR' || log.level === 'CRITICAL' || log.level === 'WARNING') {
+        setActivityFeed(prev => [{
+          id: `log-${Date.now()}`,
+          timestamp: log.timestamp || new Date().toISOString(),
+          type: 'event',
+          severity: log.level?.toLowerCase() || 'info',
+          message: log.message || 'System Event',
+          source: log.source || 'System',
+          details: log.message?.length > 50 ? log.message : null
+        }, ...prev].slice(0, 50));
+      }
+    };
 
+    // 7. Chart data update
+    const handleChartUpdate = (data) => {
+      console.log("[WebSocket] Chart update:", data);
+      if (data.chart === 'threat_timeline') {
+        setThreatTrends(prev => [...prev, data.data].slice(-24));
+      }
+    };
+
+    // Register all WebSocket listeners
+    socket.on("stats_update", handleStatsUpdate);
+    socket.on("threat_location", handleThreatLocation);
+    socket.on("activity_update", handleActivityUpdate);
+    socket.on("scan_progress", handleScanProgress);
+    socket.on("new_alert", handleAlert);
+    socket.on("tamper_alert", handleAlert);
+    socket.on("ransomware_alert", handleAlert);
+    socket.on("system_log", handleSystemLog);
+    socket.on("chart_update", handleChartUpdate);
+
+    // Cleanup
     return () => {
       clearInterval(refreshInterval);
-      socket.off("new_alert", onAlert);
-      socket.off("tamper_alert", onAlert);
-      socket.off("ransomware_alert", onAlert);
+      socket.off("stats_update", handleStatsUpdate);
+      socket.off("threat_location", handleThreatLocation);
+      socket.off("activity_update", handleActivityUpdate);
+      socket.off("scan_progress", handleScanProgress);
+      socket.off("new_alert", handleAlert);
+      socket.off("tamper_alert", handleAlert);
+      socket.off("ransomware_alert", handleAlert);
+      socket.off("system_log", handleSystemLog);
+      socket.off("chart_update", handleChartUpdate);
     };
   }, []);
 
@@ -98,34 +217,22 @@ export default function EnhancedDashboard() {
   // ============================================================
   if (loading) {
     return (
-      <div className="min-h-screen bg-cyberDark flex items-center justify-center">
+      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-violet-900">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-purple-500 mx-auto mb-4"></div>
-          <p className="text-gray-400 text-lg">Loading Threat Intelligence...</p>
+          <div className="w-16 h-16 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-white text-lg font-semibold">Loading Dashboard...</p>
+          <p className="text-gray-400 text-sm mt-2">Initializing real-time threat monitoring</p>
         </div>
       </div>
     );
   }
 
   // ============================================================
-  // SEVERITY BADGE HELPER
-  // ============================================================
-  const getSeverityBadge = (severity) => {
-    const styles = {
-      critical: "bg-red-500/20 text-red-400 border-red-500/50",
-      high: "bg-orange-500/20 text-orange-400 border-orange-500/50",
-      medium: "bg-yellow-500/20 text-yellow-400 border-yellow-500/50",
-      low: "bg-blue-500/20 text-blue-400 border-blue-500/50"
-    };
-    return styles[severity?.toLowerCase()] || styles.medium;
-  };
-
-  // ============================================================
-  // UI RENDER
+  // RENDER DASHBOARD
   // ============================================================
   return (
-    <div className="min-h-screen bg-cyberDark text-white p-3 sm:p-4 md:p-6 relative overflow-x-hidden">
-      {/* Toast */}
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-violet-900 p-4 md:p-6 lg:p-8">
+      {/* Toast Notifications */}
       {toast && (
         <Toast
           message={toast.message}
@@ -134,203 +241,149 @@ export default function EnhancedDashboard() {
         />
       )}
 
-      {/* Animated Background */}
-      <div className="absolute w-[300px] h-[300px] sm:w-[400px] sm:h-[400px] md:w-[600px] md:h-[600px] bg-purple-600/10 blur-[80px] md:blur-[120px] rounded-full top-0 left-0 -translate-x-1/2 -translate-y-1/2 animate-pulse"></div>
-      <div className="absolute w-[250px] h-[250px] sm:w-[350px] sm:h-[350px] md:w-[500px] md:h-[500px] bg-cyan-600/10 blur-[80px] md:blur-[120px] rounded-full bottom-0 right-0 translate-x-1/2 translate-y-1/2 animate-pulse" style={{ animationDelay: '1s' }}></div>
-
       {/* Header */}
-      <div className="mb-6 sm:mb-8 relative z-10">
-        <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold mb-2 bg-gradient-to-r from-purple-400 via-pink-400 to-cyan-400 bg-clip-text text-transparent">
-          ThreatTrace Command Center
+      <div className="mb-6 md:mb-8">
+        <h1 className="text-3xl md:text-4xl font-bold text-white mb-2 flex items-center gap-3">
+          <ShieldCheckIcon className="w-8 h-8 md:w-10 md:h-10 text-purple-400" />
+          ThreatTrace Dashboard
         </h1>
-        <p className="text-gray-400 text-xs sm:text-sm">Real-time Global Threat Intelligence Dashboard</p>
+        <p className="text-gray-400 text-sm md:text-base flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+          Real-time threat monitoring and analytics
+        </p>
       </div>
 
-      {/* Quick Stats Cards - Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-4 sm:mb-6 relative z-10">
-        <StatCard
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-6 md:mb-8">
+        <AnimatedStatCard
           title="Total Threats Today"
-          value={dashboardStats.total_threats_today?.toLocaleString() || "0"}
-          subtitle="Across all severity levels"
-          icon={<FireIcon className="w-6 h-6 sm:w-8 sm:h-8" />}
+          value={dashboardStats.total_threats_today}
+          subtitle="Detected threats"
+          icon={<ExclamationTriangleIcon className="w-6 h-6" />}
+          trend={{ type: 'up', value: '+12% from yesterday' }}
           color="red"
-          trend={{ type: "up", value: "+12.5% from yesterday" }}
+          animate={true}
         />
-        <StatCard
+        <AnimatedStatCard
           title="Blocked Attacks"
-          value={dashboardStats.blocked_attacks?.toLocaleString() || "0"}
-          subtitle="Successfully mitigated"
-          icon={<ShieldCheckIcon className="w-6 h-6 sm:w-8 sm:h-8" />}
+          value={dashboardStats.blocked_attacks}
+          subtitle="Successfully blocked"
+          icon={<ShieldCheckIcon className="w-6 h-6" />}
+          trend={{ type: 'up', value: '+8% effectiveness' }}
           color="green"
-          trend={{ type: "up", value: "+8.3% effectiveness" }}
+          animate={true}
         />
-        <StatCard
+        <AnimatedStatCard
           title="Active Threats"
-          value={dashboardStats.active_threats || "0"}
-          subtitle="Requires immediate attention"
-          icon={<ExclamationTriangleIcon className="w-6 h-6 sm:w-8 sm:h-8" />}
+          value={dashboardStats.active_threats}
+          subtitle="Requiring attention"
+          icon={<FireIcon className="w-6 h-6" />}
+          trend={{ type: 'down', value: '-3 from last hour' }}
           color="yellow"
-          trend={{ type: "down", value: "-3 from last hour" }}
+          animate={true}
         />
-        <StatCard
-          title="Global Coverage"
-          value={dashboardStats.countries_affected || "0"}
-          subtitle="Countries affected"
-          icon={<GlobeAltIcon className="w-6 h-6 sm:w-8 sm:h-8" />}
+        <AnimatedStatCard
+          title="Files Scanned"
+          value={dashboardStats.files_scanned}
+          subtitle="Automated scans"
+          icon={<DocumentMagnifyingGlassIcon className="w-6 h-6" />}
+          trend={{ type: 'up', value: '+156 today' }}
           color="cyan"
+          animate={true}
         />
       </div>
 
-      {/* Bento Grid Layout */}
-      <div className="grid grid-cols-12 gap-3 sm:gap-4 md:gap-6 relative z-10">
-        
-        {/* 3D GLOBE - Large Panel (Spans 8 columns) */}
-        <div className="col-span-12 lg:col-span-8 glass-cyber p-4 sm:p-5 md:p-6 border border-white/20 rounded-xl md:rounded-2xl shadow-2xl">
-          <div className="flex items-center justify-between mb-3 sm:mb-4">
-            <h2 className="text-lg sm:text-xl md:text-2xl font-semibold text-cyan-400 flex items-center gap-2">
-              <GlobeAltIcon className="w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7" />
-              Global Threat Map
-            </h2>
-            <div className="text-xs text-gray-400 flex items-center gap-2">
-              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-              <span className="hidden sm:inline">Live</span>
+      {/* Main Content Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 mb-6 md:mb-8">
+        {/* Globe Visualization - 2 columns */}
+        <div className="lg:col-span-2">
+          <div className="bg-gradient-to-br from-gray-900/40 to-black/40 border border-white/10 backdrop-blur-xl rounded-xl md:rounded-2xl p-4 md:p-6 h-[500px] md:h-[600px]">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold text-white flex items-center gap-2">
+                <GlobeAltIcon className="w-6 h-6 text-purple-400" />
+                Global Threat Map
+              </h2>
+              <span className="text-xs text-gray-400 font-mono">
+                {threatLocations.length} locations
+              </span>
+            </div>
+            <div className="h-[calc(100%-3rem)]">
+              <GlobeVisualization threats={threatLocations} />
             </div>
           </div>
-          <div className="h-[300px] sm:h-[400px] md:h-[500px] lg:h-[600px] rounded-xl overflow-hidden">
-            <GlobeVisualization threats={threatLocations} />
-          </div>
         </div>
 
-        {/* TOP THREATS LIST - Side Panel (Spans 4 columns) */}
-        <div className="col-span-12 lg:col-span-4 glass-cyber p-4 sm:p-5 md:p-6 border border-white/20 rounded-xl md:rounded-2xl shadow-2xl">
-          <h2 className="text-lg sm:text-xl font-semibold text-red-400 mb-3 sm:mb-4 flex items-center gap-2">
-            <FireIcon className="w-5 h-5 sm:w-6 sm:h-6" />
-            Active Threats
-          </h2>
-          <div className="space-y-3 max-h-[300px] sm:max-h-[400px] lg:max-h-[560px] overflow-y-auto pr-2 custom-scrollbar">
-            {topThreats.map((threat, idx) => (
-              <div
-                key={idx}
-                className="bg-white/5 border border-white/10 rounded-xl p-4 hover:bg-white/10 transition-all duration-200 cursor-pointer hover:scale-105"
-              >
-                <div className="flex items-start justify-between mb-2">
-                  <div className="flex-1">
-                    <div className="font-semibold text-white text-sm mb-1">
-                      {threat.name}
-                    </div>
-                    <div className="text-xs text-gray-400">
-                      ID: {threat.id}
-                    </div>
-                  </div>
-                  <span className={`text-[10px] px-2 py-1 rounded-full border ${getSeverityBadge(threat.severity)} font-semibold uppercase`}>
-                    {threat.severity}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-gray-400">
-                    Via: <span className="text-cyan-400">{threat.source}</span>
-                  </span>
-                  <span className="text-gray-500 flex items-center gap-1">
-                    <ClockIcon className="w-3 h-3" />
-                    {threat.timestamp}
-                  </span>
-                </div>
-                <div className="mt-2">
-                  <span className="text-[10px] px-2 py-1 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">
-                    {threat.status}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
+        {/* Live Activity Feed - 1 column */}
+        <div className="h-[500px] md:h-[600px]">
+          <LiveActivityFeed activities={activityFeed} maxItems={50} />
         </div>
+      </div>
 
-        {/* THREAT TRENDS CHART - Wide Panel */}
-        <div className="col-span-12 lg:col-span-8 glass-cyber p-4 sm:p-5 md:p-6 border border-white/20 rounded-xl md:rounded-2xl shadow-2xl">
-          <h2 className="text-lg sm:text-xl font-semibold text-purple-400 mb-3 sm:mb-4 flex items-center gap-2">
-            <ChartBarIcon className="w-5 h-5 sm:w-6 sm:h-6" />
-            24-Hour Threat Trends
+      {/* Charts Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6 mb-6 md:mb-8">
+        {/* Threat Trends */}
+        <div className="bg-gradient-to-br from-gray-900/40 to-black/40 border border-white/10 backdrop-blur-xl rounded-xl md:rounded-2xl p-4 md:p-6">
+          <h2 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
+            <ChartBarIcon className="w-6 h-6 text-cyan-400" />
+            Threat Trends (24h)
           </h2>
-          <div className="h-[250px] sm:h-[300px] md:h-[350px]">
+          <div className="h-[300px]">
             <ThreatTrendsChart data={threatTrends} />
           </div>
         </div>
 
-        {/* SEVERITY DISTRIBUTION - Small Panel */}
-        <div className="col-span-12 lg:col-span-4 glass-cyber p-4 sm:p-5 md:p-6 border border-white/20 rounded-xl md:rounded-2xl shadow-2xl">
-          <h2 className="text-lg sm:text-xl font-semibold text-yellow-400 mb-3 sm:mb-4">
-            Severity Breakdown
+        {/* Threat Types Distribution */}
+        <div className="bg-gradient-to-br from-gray-900/40 to-black/40 border border-white/10 backdrop-blur-xl rounded-xl md:rounded-2xl p-4 md:p-6">
+          <h2 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
+            <FireIcon className="w-6 h-6 text-red-400" />
+            Threat Distribution
           </h2>
-          <div className="h-[250px] sm:h-[300px] md:h-[350px]">
-            <SeverityChart data={severityStats} />
-          </div>
-        </div>
-
-        {/* THREAT TYPES CHART - Medium Panel */}
-        <div className="col-span-12 lg:col-span-6 glass-cyber p-4 sm:p-5 md:p-6 border border-white/20 rounded-xl md:rounded-2xl shadow-2xl">
-          <h2 className="text-lg sm:text-xl font-semibold text-pink-400 mb-3 sm:mb-4">
-            Attack Types Distribution
-          </h2>
-          <div className="h-[300px] sm:h-[350px] md:h-[400px]">
+          <div className="h-[300px]">
             <ThreatTypesChart data={threatTypes} />
-          </div>
-        </div>
-
-        {/* SYSTEM STATS - Info Panel */}
-        <div className="col-span-12 lg:col-span-6 glass-cyber p-4 sm:p-5 md:p-6 border border-white/20 rounded-xl md:rounded-2xl shadow-2xl">
-          <h2 className="text-lg sm:text-xl font-semibold text-cyan-400 mb-3 sm:mb-4">
-            System Performance
-          </h2>
-          <div className="space-y-3 sm:space-y-4">
-            <div className="flex items-center justify-between p-3 sm:p-4 bg-white/5 rounded-xl border border-white/10">
-              <div>
-                <div className="text-xs sm:text-sm text-gray-400 mb-1">Files Scanned</div>
-                <div className="text-xl sm:text-2xl font-bold text-white">{dashboardStats.files_scanned?.toLocaleString() || "0"}</div>
-              </div>
-              <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-full flex items-center justify-center">
-                <ChartBarIcon className="w-6 h-6 sm:w-8 sm:h-8 text-purple-400" />
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between p-3 sm:p-4 bg-white/5 rounded-xl border border-white/10">
-              <div>
-                <div className="text-xs sm:text-sm text-gray-400 mb-1">Integrity Checks</div>
-                <div className="text-xl sm:text-2xl font-bold text-white">{dashboardStats.integrity_checks?.toLocaleString() || "0"}</div>
-              </div>
-              <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gradient-to-br from-cyan-500/20 to-blue-500/20 rounded-full flex items-center justify-center">
-                <ShieldCheckIcon className="w-6 h-6 sm:w-8 sm:h-8 text-cyan-400" />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 sm:gap-4">
-              <div className="p-3 sm:p-4 bg-white/5 rounded-xl border border-white/10 text-center">
-                <div className="text-xs sm:text-sm text-gray-400 mb-2">Avg Response</div>
-                <div className="text-lg sm:text-xl font-bold text-green-400">{dashboardStats.avg_response_time || "N/A"}</div>
-              </div>
-              <div className="p-3 sm:p-4 bg-white/5 rounded-xl border border-white/10 text-center">
-                <div className="text-xs sm:text-sm text-gray-400 mb-2">Uptime</div>
-                <div className="text-lg sm:text-xl font-bold text-green-400">{dashboardStats.uptime || "N/A"}</div>
-              </div>
-            </div>
-
-            {/* Real-time status indicator */}
-            <div className="p-3 sm:p-4 bg-gradient-to-r from-green-500/10 to-cyan-500/10 rounded-xl border border-green-500/30">
-              <div className="flex items-center gap-3">
-                <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
-                <div>
-                  <div className="text-xs sm:text-sm font-semibold text-green-400">All Systems Operational</div>
-                  <div className="text-xs text-gray-400">Last updated: Just now</div>
-                </div>
-              </div>
-            </div>
           </div>
         </div>
       </div>
 
-      {/* Footer Info */}
-      <div className="mt-6 sm:mt-8 text-center text-xs text-gray-500 relative z-10 px-2">
-        <p>ThreatTrace © 2026 - AI-Powered Security Monitoring Platform</p>
-        <p className="mt-1 hidden sm:block">Data refreshes every 30 seconds | Real-time threat detection active</p>
+      {/* Additional Stats */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+        <AnimatedStatCard
+          title="Integrity Checks"
+          value={dashboardStats.integrity_checks}
+          subtitle="Files monitored"
+          icon={<LockClosedIcon className="w-6 h-6" />}
+          color="purple"
+          animate={true}
+        />
+        <AnimatedStatCard
+          title="Countries Affected"
+          value={dashboardStats.countries_affected}
+          subtitle="Geographic spread"
+          icon={<GlobeAltIcon className="w-6 h-6" />}
+          color="blue"
+          animate={true}
+        />
+        <AnimatedStatCard
+          title="Avg Response Time"
+          value={dashboardStats.avg_response_time}
+          subtitle="Detection speed"
+          icon={<ClockIcon className="w-6 h-6" />}
+          color="green"
+          animate={false}
+        />
+        <AnimatedStatCard
+          title="System Uptime"
+          value={dashboardStats.uptime}
+          subtitle="Availability"
+          icon={<ShieldCheckIcon className="w-6 h-6" />}
+          color="cyan"
+          animate={false}
+        />
+      </div>
+
+      {/* Footer */}
+      <div className="mt-8 text-center text-gray-500 text-sm">
+        <p>🛡️ ThreatTrace - Real-Time Automated Security Monitoring</p>
+        <p className="text-xs mt-1">Last updated: {new Date().toLocaleTimeString()}</p>
       </div>
     </div>
   );
