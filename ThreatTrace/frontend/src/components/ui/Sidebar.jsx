@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { NavLink } from "react-router-dom";
 import socket from "../../utils/socket";
+import Logo from "./Logo";
 
 import {
   ArrowRightOnRectangleIcon,
@@ -73,30 +74,37 @@ export default function Sidebar({ open, setOpen, mobileMenuOpen, setMobileMenuOp
       {/* HEADER */}
       {/* -------------------------------------- */}
       <header className="flex items-center justify-between p-4 border-b border-white/10">
-        <h1
+        <div
           className={`
-            text-lg sm:text-xl font-Orbitron font-bold text-cyberNeon tracking-widest
             transition-all duration-300
             ${expanded ? "opacity-100" : "opacity-0 w-0"}
           `}
         >
-          ThreatTrace
-        </h1>
+          {expanded && <Logo variant="full" size="md" />}
+        </div>
+        
+        {!expanded && (
+          <div className="flex justify-center w-full">
+            <Logo variant="icon" size="sm" />
+          </div>
+        )}
 
         {/* Desktop toggle button */}
-        <button
-          className="hidden lg:block p-2 bg-white/10 rounded-lg border border-white/20 hover:bg-white/20 transition"
-          onClick={() => setOpen(!open)}
-        >
-          <svg
-            className="w-5 h-5 text-cyberNeon"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
+        {expanded && (
+          <button
+            className="hidden lg:block p-2 bg-white/10 rounded-lg border border-white/20 hover:bg-white/20 transition"
+            onClick={() => setOpen(!open)}
           >
-            <path strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
-          </svg>
-        </button>
+            <svg
+              className="w-5 h-5 text-cyberNeon"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
+        )}
 
         {/* Mobile close button */}
         <button

@@ -2,6 +2,8 @@
 import axios from "axios";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import CyberpunkBackground from "../components/ui/CyberpunkBackground";
+import Logo from "../components/ui/Logo";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -44,8 +46,12 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center">
-      <div className="glass-cyber w-[380px] p-8 shadow-neon">
+    <div className="min-h-screen flex items-center justify-center relative">
+      <CyberpunkBackground />
+      <div className="glass-cyber w-[380px] p-8 shadow-neon relative z-10">
+        <div className="flex justify-center mb-6">
+          <Logo variant="full" size="lg" />
+        </div>
         <h2 className="text-3xl cyber-gradient-text text-center mb-6">
           Welcome Back
         </h2>

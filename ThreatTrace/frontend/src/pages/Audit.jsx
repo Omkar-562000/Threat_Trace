@@ -130,31 +130,83 @@ export default function Audit() {
       {/* Scheduler – TECHNICAL ONLY */}
       {hasRole(["technical"]) ? (
         <div className="glass-cyber p-4 mt-6">
-          <h3 className="font-semibold mb-2">🔧 Scheduler Controls (Technical)</h3>
+          <h3 className="font-semibold mb-3">🔧 Scheduler Controls (Technical)</h3>
+          
+          {/* Status Badge */}
+          <div className="mb-4">
+            <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
+              schedRunning 
+                ? "bg-green-600 text-white" 
+                : "bg-gray-600 text-white"
+            }`}>
+              {schedRunning ? "⚡ Running" : "⏸️ Stopped"}
+            </span>
+          </div>
 
-          <div className="flex items-center gap-3">
+          {/* Controls */}
+          <div className="flex flex-wrap items-center gap-3 mb-4">
+            <label className="text-sm text-gray-400">Interval (seconds):</label>
             <input
               type="number"
               className="cyber-input w-32"
               value={schedInterval}
               onChange={(e) => setSchedInterval(Number(e.target.value))}
+              min="60"
             />
 
-            <button className="cyber-btn" onClick={() => schedulerStart(schedInterval)}>
-              Start
+            <button 
+              className="cyber-btn bg-green-600 hover:bg-green-700 disabled:opacity-50"
+              disabled={schedRunning}
+              onClick={async () => {
+                try {
+                  await schedulerStart(schedInterval);
+                  pushToast("Scheduler started", "success");
+                  await loadSchedulerStatus();
+                } catch (err) {
+                  pushToast(err.response?.data?.message || "Failed to start scheduler", "error");
+                }
+              }}
+            >
+              ▶ Start
             </button>
 
-            <button className="cyber-btn" onClick={schedulerStop}>
-              Stop
+            <button 
+              className="cyber-btn bg-red-600 hover:bg-red-700 disabled:opacity-50"
+              disabled={!schedRunning}
+              onClick={async () => {
+                try {
+                  await schedulerStop();
+                  pushToast("Scheduler stopped", "success");
+                  await loadSchedulerStatus();
+                } catch (err) {
+                  pushToast(err.response?.data?.message || "Failed to stop scheduler", "error");
+                }
+              }}
+            >
+              ⏹ Stop
             </button>
 
-            <button className="cyber-btn" onClick={schedulerRunNow}>
-              Run Now
+            <button 
+              className="cyber-btn bg-blue-600 hover:bg-blue-700"
+              onClick={async () => {
+                try {
+                  await schedulerRunNow();
+                  pushToast("Manual scan triggered", "success");
+                  await loadHistory();
+                } catch (err) {
+                  pushToast(err.response?.data?.message || "Failed to run scan", "error");
+                }
+              }}
+            >
+              ⚡ Run Now
             </button>
+          </div>
 
-            <span className="text-sm">
-              {schedRunning ? "⚡ Running" : "⏸️ Stopped"}
-            </span>
+          {/* Help Text */}
+          <div className="text-sm text-gray-400 space-y-1">
+            <p><strong>▶ Start:</strong> Begin automated scans at specified interval</p>
+            <p><strong>⏹ Stop:</strong> Halt automated scanning</p>
+            <p><strong>⚡ Run Now:</strong> Trigger immediate scan (independent of schedule)</p>
           </div>
         </div>
       ) : (
@@ -167,6 +219,19 @@ export default function Audit() {
                 Upgrade to <span className="text-cyberPurple font-semibold">Technical</span> plan to access automated scheduled scans
               </p>
             </div>
+          </div>
+          
+          {/* Help Text for Non-Technical Users */}
+          <div className="mt-4 text-sm text-gray-400 space-y-2">
+            <p><strong>What is the Scheduler?</strong></p>
+            <p>The scheduler automatically scans registered files at regular intervals to detect tampering, eliminating the need for manual verification.</p>
+            <p><strong>Benefits:</strong></p>
+            <ul className="list-disc list-inside ml-2 space-y-1">
+              <li>Continuous monitoring 24/7</li>
+              <li>Instant alerts on file modifications</li>
+              <li>Automatic audit history updates</li>
+              <li>Customizable scan intervals</li>
+            </ul>
           </div>
         </div>
       )}

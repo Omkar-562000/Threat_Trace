@@ -1,4 +1,4 @@
-i// frontend/src/components/ui/Logo.jsx
+// frontend/src/components/ui/Logo.jsx
 import { useEffect, useState } from "react";
 import { getBestLogo, scanAvailableLogos } from "../../utils/logoUtils";
 

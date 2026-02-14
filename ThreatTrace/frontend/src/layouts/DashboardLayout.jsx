@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Sidebar from "../components/ui/Sidebar";
 import Toast from "../components/ui/Toast";
 import TopNavbar from "../components/ui/TopNavbar";
+import WebNettingBackground from "../components/ui/WebNettingBackground";
 import socket from "../utils/socket";
 
 export default function DashboardLayout({ children }) {
@@ -59,7 +60,8 @@ export default function DashboardLayout({ children }) {
   }, []);
 
   return (
-    <div className="flex h-screen overflow-hidden bg-cyberDark">
+    <div className="flex h-screen overflow-hidden bg-cyberDark relative">
+      <WebNettingBackground />
 
       {/* ---------------------------------------------------------
          MOBILE OVERLAY (when menu is open)
