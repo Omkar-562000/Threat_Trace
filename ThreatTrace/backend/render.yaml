@@ -1,0 +1,29 @@
+services:
+  # Backend API Service
+  - type: web
+    name: threattrace-backend
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn --worker-class eventlet -w 1 --bind 0.0.0.0:$PORT app:app
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: DEBUG
+        value: False
+      - key: SECRET_KEY
+        generateValue: true
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: MONGO_URI
+        sync: false  # You'll add this manually in Render dashboard
+      - key: MAIL_SERVER
+        value: smtp.gmail.com
+      - key: MAIL_PORT
+        value: 587
+      - key: MAIL_USE_TLS
+        value: True
+      - key: MAIL_USERNAME
+        sync: false  # Add manually
+      - key: MAIL_PASSWORD
+        sync: false  # Add manually
