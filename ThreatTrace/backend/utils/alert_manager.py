@@ -60,6 +60,7 @@ def send_alert(title, message, severity="info", source="system"):
         "message": message,
         "severity": severity,
         "source": source,
+        "status": "active",  # Default status for new alerts
         "timestamp": datetime.utcnow().isoformat() + "Z",
     }
 

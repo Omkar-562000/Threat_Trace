@@ -1,0 +1,54 @@
+═══════════════════════════════════════════════════════════
+   ThreatTrace - Quick Logo Setup Guide
+═══════════════════════════════════════════════════════════
+
+📁 WHERE TO PUT YOUR LOGOS:
+
+1. Full Logo (with text):
+   └─ ThreatTrace/frontend/public/images/logos/logo-full.png
+   
+2. Icon Logo (symbol only):
+   └─ ThreatTrace/frontend/public/images/logos/logo-icon.png
+
+3. Background Image (optional):
+   └─ ThreatTrace/frontend/public/images/backgrounds/auth-bg.jpg
+
+
+📐 RECOMMENDED SIZES:
+
+• Full Logo:  200x50px to 400x100px (PNG or SVG)
+• Icon Logo:  64x64px to 128x128px (PNG or SVG)
+• Background: 1920x1080px (JPG)
+
+
+🎨 WHERE LOGOS WILL APPEAR:
+
+✓ Login page - Center top (Full Logo)
+✓ Signup page - Center top (Full Logo)
+✓ Sidebar expanded - Top left (Full Logo)
+✓ Sidebar collapsed - Top left (Icon Logo)
+
+
+⚡ QUICK STEPS:
+
+1. Prepare your logo files
+2. Name them: logo-full.png and logo-icon.png
+3. Copy to: frontend/public/images/logos/
+4. Refresh browser - Done! ✨
+
+
+💡 NO LOGO YET?
+
+Don't worry! The app shows a professional placeholder:
+• Gradient shield icon
+• "ThreatTrace" text with cyber styling
+• Looks great until you add your own logo
+
+
+🔧 NEED HELP?
+
+Read: public/images/README.md
+(Complete guide with design tips and troubleshooting)
+
+
+═══════════════════════════════════════════════════════════

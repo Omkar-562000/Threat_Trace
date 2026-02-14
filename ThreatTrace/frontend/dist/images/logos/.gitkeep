@@ -1,0 +1,8 @@
+# This file ensures the logos directory is tracked by git
+# Place your logo files here following the naming conventions in README.md
+
+# Supported formats: .png, .jpg, .jpeg, .svg, .webp
+# Recommended names:
+# - logo-full.png (for full logo with text)
+# - logo-icon.png (for icon-only logo)
+# - logo.png (generic logo, used as fallback)
