@@ -1,6 +1,7 @@
 // src/pages/EnhancedDashboard.jsx - Real-Time Enhanced Dashboard
 import { useEffect, useState } from "react";
 import axios from "axios";
+import { useNavigate } from "react-router-dom";
 import { 
   ShieldCheckIcon, 
   FireIcon, 
@@ -19,8 +20,10 @@ import AnimatedStatCard from "../components/AnimatedStatCard";
 import LiveActivityFeed from "../components/LiveActivityFeed";
 import Toast from "../components/ui/Toast";
 import socket from "../utils/socket";
+import axiosInstance from "../utils/axiosConfig";
 
 export default function EnhancedDashboard() {
+  const navigate = useNavigate();
   const API_ROOT = import.meta.env.VITE_API_BASE || "http://127.0.0.1:5000";
   const API = `${API_ROOT}/api/dashboard`;
 
@@ -48,9 +51,19 @@ export default function EnhancedDashboard() {
   const fetchAllData = async () => {
     try {
       setLoading(true);
-      
-      const [locations, trends, types, severity, stats, threats] = await Promise.all([
-        axios.get(`${API}/threat-locations`),
+
+      let locationsData = [];
+      try {
+        const tracked = await axiosInstance.get(`${API_ROOT}/api/locations/recent`, {
+          params: { hours: 24 },
+        });
+        locationsData = tracked.data?.points || [];
+      } catch {
+        const fallback = await axios.get(`${API}/threat-locations`);
+        locationsData = fallback.data?.threats || [];
+      }
+
+      const [trends, types, severity, stats, threats] = await Promise.all([
         axios.get(`${API}/threat-trends`),
         axios.get(`${API}/threat-types`),
         axios.get(`${API}/severity-stats`),
@@ -58,7 +71,7 @@ export default function EnhancedDashboard() {
         axios.get(`${API}/top-threats`)
       ]);
 
-      setThreatLocations(locations.data.threats || []);
+      setThreatLocations(locationsData);
       setThreatTrends(trends.data.data || []);
       setThreatTypes(types.data.data || []);
       setSeverityStats(severity.data.data || {});
@@ -308,7 +321,17 @@ export default function EnhancedDashboard() {
               </span>
             </div>
             <div className="h-[calc(100%-3rem)]">
-              <GlobeVisualization threats={threatLocations} />
+              <GlobeVisualization
+                threats={threatLocations}
+                onThreatClick={(point) => {
+                  const eventId = point.event_id || point.id;
+                  if (eventId) {
+                    navigate(`/locations?event_id=${eventId}`);
+                  } else {
+                    navigate("/locations");
+                  }
+                }}
+              />
             </div>
           </div>
         </div>

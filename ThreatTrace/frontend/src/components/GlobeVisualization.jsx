@@ -2,7 +2,7 @@
 import { useEffect, useState, useRef } from "react";
 import Globe from "react-globe.gl";
 
-export default function GlobeVisualization({ threats = [] }) {
+export default function GlobeVisualization({ threats = [], onThreatClick = null, selectedThreatId = "" }) {
   const globeEl = useRef();
   const [dimensions, setDimensions] = useState({ width: 600, height: 600 });
 
@@ -58,8 +58,8 @@ export default function GlobeVisualization({ threats = [] }) {
         pointLat="lat"
         pointLng="lng"
         pointColor={d => getPointColor(d.severity)}
-        pointAltitude={0.01}
         pointRadius={d => getPointSize(d.count)}
+        pointAltitude={d => (selectedThreatId && (d.id === selectedThreatId || d.event_id === selectedThreatId) ? 0.03 : 0.01)}
         
         // Labels
         pointLabel={d => `
@@ -85,10 +85,15 @@ export default function GlobeVisualization({ threats = [] }) {
               <strong>Threats:</strong> ${d.count}
             </div>
             <div style="font-size: 11px; color: #999; margin-top: 6px;">
-              ID: ${d.id}
+              ID: ${d.id || d.event_id || "N/A"}
             </div>
           </div>
         `}
+        onPointClick={(point) => {
+          if (onThreatClick) {
+            onThreatClick(point);
+          }
+        }}
         
         // Rings for emphasis
         ringsData={threats.filter(d => d.severity === 'critical' || d.severity === 'high')}

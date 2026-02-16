@@ -20,6 +20,8 @@ import Ransomware from "./pages/Ransomware";
 import Reports from "./pages/Reports";
 import Settings from "./pages/Settings";
 import SystemLogs from "./pages/SystemLogs";
+import LocationTracking from "./pages/LocationTracking";
+import SecurityControl from "./pages/SecurityControl";
 
 export default function App() {
   return (
@@ -104,6 +106,28 @@ export default function App() {
             <ProtectedRoute>
               <DashboardLayout>
                 <Settings />
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/locations"
+          element={
+            <ProtectedRoute>
+              <DashboardLayout>
+                <LocationTracking />
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/security"
+          element={
+            <ProtectedRoute>
+              <DashboardLayout>
+                <SecurityControl />
               </DashboardLayout>
             </ProtectedRoute>
           }

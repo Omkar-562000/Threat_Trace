@@ -5,6 +5,8 @@ import csv
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 from utils.role_guard import role_required
+from flask_jwt_extended import get_jwt_identity, get_jwt
+from utils.security_audit import log_security_event
 
 reports_bp = Blueprint('reports', __name__)
 
@@ -293,6 +295,10 @@ def generate_summary_report():
 @role_required("corporate", "technical")
 def export_alerts_csv():
     try:
+        claims = get_jwt() or {}
+        identity = get_jwt_identity()
+        actor_role = claims.get("role")
+
         db = current_app.config["DB"]
         alerts_col = first_available_collection(
             get_collection_safely(db, "alerts"),
@@ -360,6 +366,26 @@ def export_alerts_csv():
             ])
 
         output.seek(0)
+        log_security_event(
+            action="export_alerts_report",
+            status="success",
+            severity="info",
+            details={
+                "format": "csv",
+                "filters": {
+                    "severity": severity,
+                    "status": status,
+                    "source": source,
+                    "date_from": date_from,
+                    "date_to": date_to,
+                },
+                "rows": len(alerts),
+            },
+            target="alerts",
+            user_id=str(identity) if identity is not None else None,
+            role=actor_role,
+            source="reports_api",
+        )
 
         return send_file(
             io.BytesIO(output.getvalue().encode("utf-8")),
@@ -370,6 +396,14 @@ def export_alerts_csv():
 
     except Exception as e:
         print("❌ export_alerts_csv error:", e)
+        log_security_event(
+            action="export_alerts_report",
+            status="failed",
+            severity="medium",
+            details={"error": str(e)},
+            target="alerts",
+            source="reports_api",
+        )
         return jsonify({"status": "error", "message": str(e)}), 500
 
 
@@ -381,6 +415,10 @@ def export_alerts_csv():
 @role_required("corporate", "technical")
 def export_summary_pdf():
     try:
+        claims = get_jwt() or {}
+        identity = get_jwt_identity()
+        actor_role = claims.get("role")
+
         db = current_app.config["DB"]
         data = request.get_json(silent=True) or {}
         date_from = data.get("date_from", "")
@@ -468,6 +506,27 @@ def export_summary_pdf():
         pdf.save()
         pdf_buffer.seek(0)
 
+        log_security_event(
+            action="export_summary_report",
+            status="success",
+            severity="info",
+            details={
+                "format": "pdf",
+                "date_from": date_from,
+                "date_to": date_to,
+                "totals": {
+                    "alerts": total_alerts,
+                    "scans": total_scans,
+                    "audits": total_audits,
+                    "logs": total_logs,
+                },
+            },
+            target="security_summary",
+            user_id=str(identity) if identity is not None else None,
+            role=actor_role,
+            source="reports_api",
+        )
+
         return send_file(
             pdf_buffer,
             mimetype="application/pdf",
@@ -477,6 +536,14 @@ def export_summary_pdf():
 
     except Exception as e:
         print("❌ export_summary_pdf error:", e)
+        log_security_event(
+            action="export_summary_report",
+            status="failed",
+            severity="medium",
+            details={"error": str(e)},
+            target="security_summary",
+            source="reports_api",
+        )
         return jsonify({"status": "error", "message": str(e)}), 500
 
 

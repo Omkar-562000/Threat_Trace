@@ -3,6 +3,8 @@ from flask import Blueprint, request, jsonify, current_app
 from datetime import datetime
 from bson import ObjectId
 from utils.role_guard import role_required
+from flask_jwt_extended import get_jwt_identity, get_jwt
+from utils.security_audit import log_security_event
 
 alerts_bp = Blueprint('alerts', __name__)
 
@@ -201,6 +203,8 @@ def acknowledge_alert(alert_id):
         # Get acknowledged_by from request
         data = request.get_json(silent=True) or {}
         acknowledged_by = data.get('acknowledged_by', 'user')
+        claims = get_jwt() or {}
+        identity = get_jwt_identity()
         
         # Update alert
         result = collection.update_one(
@@ -219,6 +223,17 @@ def acknowledge_alert(alert_id):
                 'status': 'error',
                 'message': 'Alert not found'
             }), 404
+
+        log_security_event(
+            action="acknowledge_alert",
+            status="success",
+            severity="info",
+            details={"alert_id": alert_id, "acknowledged_by": acknowledged_by},
+            target="alerts",
+            user_id=str(identity) if identity is not None else None,
+            role=claims.get("role"),
+            source="alerts_api",
+        )
         
         return jsonify({
             'status': 'success',
@@ -227,6 +242,14 @@ def acknowledge_alert(alert_id):
         
     except Exception as e:
         print(f"❌ acknowledge_alert error: {e}")
+        log_security_event(
+            action="acknowledge_alert",
+            status="failed",
+            severity="medium",
+            details={"alert_id": alert_id, "error": str(e)},
+            target="alerts",
+            source="alerts_api",
+        )
         return jsonify({
             'status': 'error',
             'message': f'Failed to acknowledge alert: {str(e)}'
@@ -262,6 +285,8 @@ def resolve_alert(alert_id):
         data = request.get_json(silent=True) or {}
         resolved_by = data.get('resolved_by', 'user')
         note = data.get('note', '')
+        claims = get_jwt() or {}
+        identity = get_jwt_identity()
         
         # Update alert
         update_data = {
@@ -283,6 +308,17 @@ def resolve_alert(alert_id):
                 'status': 'error',
                 'message': 'Alert not found'
             }), 404
+
+        log_security_event(
+            action="resolve_alert",
+            status="success",
+            severity="info",
+            details={"alert_id": alert_id, "resolved_by": resolved_by},
+            target="alerts",
+            user_id=str(identity) if identity is not None else None,
+            role=claims.get("role"),
+            source="alerts_api",
+        )
         
         return jsonify({
             'status': 'success',
@@ -291,6 +327,14 @@ def resolve_alert(alert_id):
         
     except Exception as e:
         print(f"❌ resolve_alert error: {e}")
+        log_security_event(
+            action="resolve_alert",
+            status="failed",
+            severity="medium",
+            details={"alert_id": alert_id, "error": str(e)},
+            target="alerts",
+            source="alerts_api",
+        )
         return jsonify({
             'status': 'error',
             'message': f'Failed to resolve alert: {str(e)}'
@@ -308,6 +352,8 @@ def delete_alert(alert_id):
     """
     try:
         collection = get_alerts_collection()
+        claims = get_jwt() or {}
+        identity = get_jwt_identity()
         
         # Validate ObjectId
         try:
@@ -326,6 +372,17 @@ def delete_alert(alert_id):
                 'status': 'error',
                 'message': 'Alert not found'
             }), 404
+
+        log_security_event(
+            action="delete_alert",
+            status="success",
+            severity="high",
+            details={"alert_id": alert_id},
+            target="alerts",
+            user_id=str(identity) if identity is not None else None,
+            role=claims.get("role"),
+            source="alerts_api",
+        )
         
         return jsonify({
             'status': 'success',
@@ -334,6 +391,14 @@ def delete_alert(alert_id):
         
     except Exception as e:
         print(f"❌ delete_alert error: {e}")
+        log_security_event(
+            action="delete_alert",
+            status="failed",
+            severity="high",
+            details={"alert_id": alert_id, "error": str(e)},
+            target="alerts",
+            source="alerts_api",
+        )
         return jsonify({
             'status': 'error',
             'message': f'Failed to delete alert: {str(e)}'
@@ -360,6 +425,8 @@ def bulk_acknowledge_alerts():
         data = request.get_json(silent=True) or {}
         alert_ids = data.get('alert_ids', [])
         acknowledged_by = data.get('acknowledged_by', 'user')
+        claims = get_jwt() or {}
+        identity = get_jwt_identity()
         
         if not alert_ids or not isinstance(alert_ids, list):
             return jsonify({
@@ -387,7 +454,18 @@ def bulk_acknowledge_alerts():
                 }
             }
         )
-        
+
+        log_security_event(
+            action="bulk_acknowledge_alerts",
+            status="success",
+            severity="info",
+            details={"count": result.modified_count},
+            target="alerts",
+            user_id=str(identity) if identity is not None else None,
+            role=claims.get("role"),
+            source="alerts_api",
+        )
+
         return jsonify({
             'status': 'success',
             'message': f'{result.modified_count} alerts acknowledged',
@@ -396,6 +474,14 @@ def bulk_acknowledge_alerts():
         
     except Exception as e:
         print(f"❌ bulk_acknowledge_alerts error: {e}")
+        log_security_event(
+            action="bulk_acknowledge_alerts",
+            status="failed",
+            severity="medium",
+            details={"error": str(e)},
+            target="alerts",
+            source="alerts_api",
+        )
         return jsonify({
             'status': 'error',
             'message': f'Failed to acknowledge alerts: {str(e)}'
@@ -422,6 +508,8 @@ def bulk_resolve_alerts():
         data = request.get_json(silent=True) or {}
         alert_ids = data.get('alert_ids', [])
         resolved_by = data.get('resolved_by', 'user')
+        claims = get_jwt() or {}
+        identity = get_jwt_identity()
         
         if not alert_ids or not isinstance(alert_ids, list):
             return jsonify({
@@ -449,7 +537,18 @@ def bulk_resolve_alerts():
                 }
             }
         )
-        
+
+        log_security_event(
+            action="bulk_resolve_alerts",
+            status="success",
+            severity="info",
+            details={"count": result.modified_count},
+            target="alerts",
+            user_id=str(identity) if identity is not None else None,
+            role=claims.get("role"),
+            source="alerts_api",
+        )
+
         return jsonify({
             'status': 'success',
             'message': f'{result.modified_count} alerts resolved',
@@ -458,6 +557,14 @@ def bulk_resolve_alerts():
         
     except Exception as e:
         print(f"❌ bulk_resolve_alerts error: {e}")
+        log_security_event(
+            action="bulk_resolve_alerts",
+            status="failed",
+            severity="medium",
+            details={"error": str(e)},
+            target="alerts",
+            source="alerts_api",
+        )
         return jsonify({
             'status': 'error',
             'message': f'Failed to resolve alerts: {str(e)}'

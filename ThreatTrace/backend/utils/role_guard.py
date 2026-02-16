@@ -1,6 +1,7 @@
 from functools import wraps
 from flask_jwt_extended import verify_jwt_in_request, get_jwt, get_jwt_identity
 from flask import jsonify
+from utils.security_audit import log_security_event
 
 def role_required(*allowed_roles):
     def decorator(fn):
@@ -17,6 +18,19 @@ def role_required(*allowed_roles):
                 role = identity.get("role")
 
             if role not in allowed_roles:
+                log_security_event(
+                    action="authorization_denied",
+                    status="denied",
+                    severity="medium",
+                    details={
+                        "required_roles": list(allowed_roles),
+                        "provided_role": role,
+                        "endpoint": fn.__name__,
+                    },
+                    user_id=str(identity) if identity is not None else None,
+                    role=role,
+                    source="authz",
+                )
                 return jsonify({
                     "status": "error",
                     "message": "Access denied: insufficient permissions"

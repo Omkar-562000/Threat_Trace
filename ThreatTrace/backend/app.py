@@ -19,15 +19,19 @@ This file bootstraps the entire backend:
 import atexit
 import signal
 import sys
-from flask import Flask
+from datetime import datetime
+from flask import Flask, request, jsonify
 from flask_cors import CORS
 from flask_mail import Mail
 from flask_jwt_extended import JWTManager
 from flask_bcrypt import Bcrypt
 from flask_socketio import SocketIO
+from bson import ObjectId
 
 from config import Config
 from database.db_config import init_db
+from utils.security_audit import ensure_security_audit_indexes
+from utils.canary_trap import ensure_canary_indexes
 
 
 # ============================================================
@@ -81,6 +85,77 @@ init_alert_system(socketio)
 # ============================================================
 db = init_db(app)
 app.config["DB"] = db
+ensure_security_audit_indexes(db)
+ensure_canary_indexes(db)
+
+
+def _get_client_ip():
+    xff = (request.headers.get("X-Forwarded-For") or "").split(",")[0].strip()
+    if xff:
+        return xff
+    xri = (request.headers.get("X-Real-IP") or "").strip()
+    if xri:
+        return xri
+    return request.remote_addr or "0.0.0.0"
+
+
+@app.before_request
+def block_abusive_ips():
+    # Enforce only for API routes; keep auth login/register/reset accessible.
+    path = request.path or ""
+    if not path.startswith("/api/"):
+        return None
+    if path.startswith("/api/auth/login") or path.startswith("/api/auth/register") or path.startswith("/api/auth/forgot-password") or path.startswith("/api/auth/reset-password"):
+        return None
+
+    try:
+        ip = _get_client_ip()
+        row = db["blocked_ips"].find_one({"ip": ip})
+        if row and row.get("blocked_until") and row["blocked_until"] > datetime.utcnow():
+            return jsonify({
+                "status": "error",
+                "message": "Request blocked by runtime security policy"
+            }), 403
+    except Exception:
+        # Fail-open for availability if lookup fails.
+        return None
+    return None
+
+
+@jwt.token_in_blocklist_loader
+def is_token_revoked(jwt_header, jwt_payload):
+    """
+    Reject tokens when:
+    1) jti exists in explicit revoked token store, or
+    2) user has force_logout_after newer than token issue time.
+    """
+    try:
+        token_jti = jwt_payload.get("jti")
+        token_sub = jwt_payload.get("sub")
+        token_iat = jwt_payload.get("iat")
+
+        if token_jti:
+            hit = db["revoked_tokens"].find_one({"jti": token_jti, "revoked": True})
+            if hit:
+                return True
+
+        if token_sub and token_iat:
+            try:
+                user = db["users"].find_one({"_id": ObjectId(str(token_sub))})
+            except Exception:
+                user = db["users"].find_one({"_id": str(token_sub)})
+            if not user:
+                return False
+
+            force_logout_after = user.get("force_logout_after")
+            if force_logout_after:
+                token_issued_at = datetime.utcfromtimestamp(int(token_iat))
+                if token_issued_at < force_logout_after:
+                    return True
+    except Exception:
+        return False
+
+    return False
 
 
 # ============================================================
@@ -95,6 +170,9 @@ from routes.logs_routes import logs_bp
 from routes.alerts_routes import alerts_bp
 from routes.reports_routes import reports_bp
 from routes.dashboard_routes import dashboard_bp
+from routes.locations_routes import locations_bp
+from routes.security_routes import security_bp
+from routes.canary_routes import canary_bp
 
 # Scheduler (optional)
 try:
@@ -115,6 +193,9 @@ app.register_blueprint(logs_bp, url_prefix="/api/logs")
 app.register_blueprint(alerts_bp, url_prefix="/api/alerts")
 app.register_blueprint(reports_bp, url_prefix="/api/reports")
 app.register_blueprint(dashboard_bp, url_prefix="/api/dashboard")
+app.register_blueprint(locations_bp, url_prefix="/api/locations")
+app.register_blueprint(security_bp, url_prefix="/api/security")
+app.register_blueprint(canary_bp, url_prefix="/api/canary")
 
 if scheduler_bp:
     app.register_blueprint(scheduler_bp, url_prefix="/api/scheduler")

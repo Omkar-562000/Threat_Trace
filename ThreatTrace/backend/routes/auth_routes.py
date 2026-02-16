@@ -6,6 +6,8 @@ from flask_jwt_extended import create_access_token
 from flask_mail import Message
 from datetime import datetime, timedelta
 import uuid
+from utils.alert_manager import send_alert
+from utils.security_audit import log_security_event
 
 auth_bp = Blueprint("auth_bp", __name__)
 bcrypt = Bcrypt()
@@ -13,6 +15,18 @@ bcrypt = Bcrypt()
 mail = None   # Will be initialized from app.py
 
 socketio = None  # Placeholder if socketio integration is needed later
+MAX_FAILED_ATTEMPTS = 5
+LOCKOUT_MINUTES = 15
+
+
+def _get_client_ip():
+    xff = (request.headers.get("X-Forwarded-For") or "").split(",")[0].strip()
+    if xff:
+        return xff
+    xri = (request.headers.get("X-Real-IP") or "").strip()
+    if xri:
+        return xri
+    return request.remote_addr or "0.0.0.0"
 # ------------------------------------------------------------
 # INITIALIZE MAIL (called from app.py)
 # ------------------------------------------------------------
@@ -59,7 +73,11 @@ def register():
             "email": email,
             "password": hashed_pw,
             "role": role,
-            "created_at": datetime.utcnow()
+            "created_at": datetime.utcnow(),
+            "failed_login_attempts": 0,
+            "locked_until": None,
+            "last_login_at": None,
+            "last_login_ip": None,
         })
 
         return jsonify({"status": "success", "message": "Account created successfully"}), 201
@@ -75,20 +93,112 @@ def register():
 @auth_bp.route("/login", methods=["POST"])
 def login():
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
 
         email = data.get("email", "").lower()
         password = data.get("password")
+        client_ip = _get_client_ip()
+
+        if not email or not password:
+            return jsonify({"status": "error", "message": "Email and password are required"}), 400
 
         db = current_app.config["DB"]
         users = db["users"]
 
         user = users.find_one({"email": email})
         if not user:
+            # Best-effort security telemetry for unknown-account probing
+            send_alert(
+                title="Suspicious Login Attempt",
+                message=f"Unknown account login attempt for {email} from IP {client_ip}",
+                severity="medium",
+                source="auth",
+            )
+            log_security_event(
+                action="login_attempt",
+                status="failed",
+                severity="medium",
+                details={"email": email, "reason": "unknown_user"},
+                target="auth",
+                source="auth_api",
+            )
             return jsonify({"status": "error", "message": "Invalid email or password"}), 401
 
+        locked_until = user.get("locked_until")
+        if locked_until and locked_until > datetime.utcnow():
+            mins_left = max(1, int((locked_until - datetime.utcnow()).total_seconds() // 60))
+            log_security_event(
+                action="login_attempt",
+                status="denied",
+                severity="medium",
+                details={"email": email, "reason": "account_locked", "minutes_remaining": mins_left},
+                target="auth",
+                user_id=str(user.get("_id")),
+                role=user.get("role"),
+                source="auth_api",
+            )
+            return jsonify({
+                "status": "error",
+                "message": f"Account temporarily locked due to failed attempts. Try again in {mins_left} minute(s)."
+            }), 423
+
         if not bcrypt.check_password_hash(user["password"], password):
+            failed_attempts = int(user.get("failed_login_attempts", 0)) + 1
+            update_doc = {"$set": {"failed_login_attempts": failed_attempts}}
+
+            if failed_attempts >= MAX_FAILED_ATTEMPTS:
+                lock_until = datetime.utcnow() + timedelta(minutes=LOCKOUT_MINUTES)
+                update_doc["$set"]["locked_until"] = lock_until
+                send_alert(
+                    title="Account Lockout Triggered",
+                    message=f"Account {email} locked after repeated failed logins from IP {client_ip}",
+                    severity="high",
+                    source="auth",
+                )
+                log_security_event(
+                    action="account_lockout",
+                    status="success",
+                    severity="high",
+                    details={"email": email, "failed_attempts": failed_attempts},
+                    target="auth",
+                    user_id=str(user.get("_id")),
+                    role=user.get("role"),
+                    source="auth_api",
+                )
+
+            users.update_one({"_id": user["_id"]}, update_doc)
+            log_security_event(
+                action="login_attempt",
+                status="failed",
+                severity="info",
+                details={"email": email, "reason": "invalid_password", "failed_attempts": failed_attempts},
+                target="auth",
+                user_id=str(user.get("_id")),
+                role=user.get("role"),
+                source="auth_api",
+            )
             return jsonify({"status": "error", "message": "Invalid email or password"}), 401
+
+        # Successful login -> clear lock state and failure counters
+        users.update_one(
+            {"_id": user["_id"]},
+            {"$set": {
+                "failed_login_attempts": 0,
+                "locked_until": None,
+                "last_login_at": datetime.utcnow(),
+                "last_login_ip": client_ip,
+            }}
+        )
+        log_security_event(
+            action="login_attempt",
+            status="success",
+            severity="info",
+            details={"email": email},
+            target="auth",
+            user_id=str(user.get("_id")),
+            role=user.get("role"),
+            source="auth_api",
+        )
 
         # Create JWT
         token = create_access_token(

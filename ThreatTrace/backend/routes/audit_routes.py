@@ -7,6 +7,8 @@ from werkzeug.utils import secure_filename
 
 from utils.audit_service import verify_file_integrity
 from utils.role_guard import role_required
+from flask_jwt_extended import get_jwt_identity, get_jwt
+from utils.security_audit import log_security_event
 
 
 audit_bp = Blueprint("audit_bp", __name__)
@@ -154,6 +156,8 @@ def audit_report():
 @role_required("corporate", "technical")
 def export_csv():
     try:
+        claims = get_jwt() or {}
+        identity = get_jwt_identity()
         file_path = request.args.get("file_path")
         if not file_path:
             return jsonify({"status": "error", "message": "file_path required"}), 400
@@ -183,6 +187,16 @@ def export_csv():
             ])
 
         output.seek(0)
+        log_security_event(
+            action="export_audit_report",
+            status="success",
+            severity="info",
+            details={"file_path": file_path},
+            target="audit_logs",
+            user_id=str(identity) if identity is not None else None,
+            role=claims.get("role"),
+            source="audit_api",
+        )
         return send_file(
             io.BytesIO(output.getvalue().encode()),
             mimetype="text/csv",
@@ -192,6 +206,14 @@ def export_csv():
 
     except Exception as e:
         print("export_csv error:", e)
+        log_security_event(
+            action="export_audit_report",
+            status="failed",
+            severity="medium",
+            details={"error": str(e)},
+            target="audit_logs",
+            source="audit_api",
+        )
         return jsonify({"status": "error", "message": str(e)}), 500
 
 

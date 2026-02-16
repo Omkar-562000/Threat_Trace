@@ -10,6 +10,8 @@ import {
   BellAlertIcon,
   Cog6ToothIcon,
   DocumentMagnifyingGlassIcon,
+  GlobeAltIcon,
+  LockClosedIcon,
   HomeIcon,
   InboxIcon,
   ServerStackIcon,
@@ -57,6 +59,8 @@ export default function Sidebar({ open, setOpen, mobileMenuOpen, setMobileMenuOp
     },
     { to: "/reports", label: "Reports", icon: <InboxIcon className="h-6 w-6" /> },
     { to: "/logs", label: "System Logs", icon: <ServerStackIcon className="h-6 w-6" /> },
+    { to: "/locations", label: "Locations", icon: <GlobeAltIcon className="h-6 w-6" /> },
+    { to: "/security", label: "Security Control", icon: <LockClosedIcon className="h-6 w-6" /> },
     { to: "/settings", label: "Settings", icon: <Cog6ToothIcon className="h-6 w-6" /> },
   ];
 

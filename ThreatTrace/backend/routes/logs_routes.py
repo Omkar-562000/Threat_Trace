@@ -5,6 +5,8 @@ import csv
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
 from utils.role_guard import role_required
+from flask_jwt_extended import get_jwt_identity, get_jwt
+from utils.security_audit import log_security_event
 
 logs_bp = Blueprint("logs_bp", __name__)
 
@@ -197,6 +199,9 @@ def export_logs():
             query["source"] = {"$regex": source, "$options": "i"}
 
         logs = [serialize_log(l) for l in coll.find(query).sort("timestamp", -1)]
+        claims = get_jwt() or {}
+        identity = get_jwt_identity()
+        actor_role = claims.get("role")
 
         # -------------------------------------------------
         # CSV EXPORT
@@ -215,6 +220,16 @@ def export_logs():
                 ])
 
             output.seek(0)
+            log_security_event(
+                action="export_system_logs",
+                status="success",
+                severity="info",
+                details={"format": "csv", "filters": {"q": q, "level": level, "source": source}, "rows": len(logs)},
+                target="system_logs",
+                user_id=str(identity) if identity is not None else None,
+                role=actor_role,
+                source="logs_api",
+            )
             return send_file(
                 io.BytesIO(output.getvalue().encode()),
                 mimetype="text/csv",
@@ -247,6 +262,17 @@ def export_logs():
         c.save()
         buffer.seek(0)
 
+        log_security_event(
+            action="export_system_logs",
+            status="success",
+            severity="info",
+            details={"format": "pdf", "filters": {"q": q, "level": level, "source": source}, "rows": len(logs)},
+            target="system_logs",
+            user_id=str(identity) if identity is not None else None,
+            role=actor_role,
+            source="logs_api",
+        )
+
         return send_file(
             buffer,
             mimetype="application/pdf",
@@ -256,4 +282,12 @@ def export_logs():
 
     except Exception as e:
         print("export_logs error:", e)
+        log_security_event(
+            action="export_system_logs",
+            status="failed",
+            severity="medium",
+            details={"error": str(e)},
+            target="system_logs",
+            source="logs_api",
+        )
         return jsonify({"status": "error", "message": str(e)}), 500

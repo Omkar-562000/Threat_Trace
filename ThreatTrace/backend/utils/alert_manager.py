@@ -1,97 +1,133 @@
 """
-===========================================================
-   ThreatTrace — Enterprise Unified Alert Manager
-===========================================================
-
-This module provides a single standardized alert pipeline:
-
-    🔥 1. WebSocket real-time alerts  → frontend (Toast + Alerts UI)
-    ✉️ 2. Email notifications         → Admin mailbox
-    🗄️ 3. MongoDB persistent storage   → Alerts dashboard
-
-Used by:
-    • Ransomware detection engine
-    • Audit file-integrity checker
-    • System logs anomaly streams
-    • Future ML threat-detection module
-
-All alerts flow through send_alert().
+Unified alert manager for ThreatTrace.
+Dispatches alerts to DB, email, websocket, and optional location intelligence.
 """
 
 from datetime import datetime
+import uuid
+
 from flask import current_app
+
 from utils.email_alerts import send_security_email
+from utils.geoip_service import extract_ips_from_text, geolocate_ip
 
 # Global SocketIO instance set from app.py
 socketio_instance = None
 
 
-# -------------------------------------------------------------
-# INITIALIZE ALERT SYSTEM (Called from app.py)
-# -------------------------------------------------------------
 def init_alert_system(socketio):
-    """
-    Stores a reference to the SocketIO instance for global alert broadcasting.
-    """
     global socketio_instance
     socketio_instance = socketio
-    print("✅ Alert system initialized (WebSocket ready).")
+    print("Alert system initialized (WebSocket ready).")
 
 
-# -------------------------------------------------------------
-# UNIFIED ALERT DISPATCHER
-# -------------------------------------------------------------
+def _track_location_from_alert(alert):
+    """
+    Best-effort IP extraction + geolocation from alert text.
+    Creates a tracked location event only when a public IP is present.
+    """
+    try:
+        db = current_app.config["DB"]
+        text = f"{alert.get('title', '')} {alert.get('message', '')}"
+        ips = extract_ips_from_text(text)
+        if not ips:
+            return
+
+        source_ip = ips[0]
+        geo = geolocate_ip(source_ip)
+        if not geo:
+            return
+
+        event_id = f"LOC-{uuid.uuid4().hex[:12].upper()}"
+        doc = {
+            "event_id": event_id,
+            "event_type": "alert_correlation",
+            "severity": alert.get("severity", "medium"),
+            "title": alert.get("title", "Security alert"),
+            "message": alert.get("message", ""),
+            "source": alert.get("source", "system"),
+            "source_ip": source_ip,
+            "country": geo.get("country", "Unknown"),
+            "city": geo.get("city", "Unknown"),
+            "region": geo.get("region", ""),
+            "lat": geo.get("lat", 0.0),
+            "lng": geo.get("lng", 0.0),
+            "isp": geo.get("isp", ""),
+            "org": geo.get("org", ""),
+            "confidence": 70,
+            "meta": {"auto_tracked_from_alert": True},
+            "timestamp": datetime.utcnow(),
+        }
+        db["tracked_locations"].insert_one(doc)
+
+        if socketio_instance:
+            socketio_instance.emit(
+                "threat_location",
+                {
+                    "id": event_id,
+                    "event_id": event_id,
+                    "lat": doc["lat"],
+                    "lng": doc["lng"],
+                    "city": doc["city"],
+                    "country": doc["country"],
+                    "severity": doc["severity"],
+                    "type": doc["event_type"],
+                    "count": 1,
+                    "timestamp": doc["timestamp"].isoformat() + "Z",
+                },
+            )
+            socketio_instance.emit(
+                "location_event",
+                {
+                    "event_id": event_id,
+                    "title": doc["title"],
+                    "message": doc["message"],
+                    "severity": doc["severity"],
+                    "source_ip": doc["source_ip"],
+                    "city": doc["city"],
+                    "country": doc["country"],
+                    "timestamp": doc["timestamp"].isoformat() + "Z",
+                },
+            )
+    except Exception as e:
+        print(f"Location tracking from alert failed: {e}")
+
+
 def send_alert(title, message, severity="info", source="system"):
-    """
-    Sends a complete alert packet through:
-        1️⃣ WebSocket (real-time popups)
-        2️⃣ Email (high severity only)
-        3️⃣ MongoDB alerts collection
-
-    Args:
-        title: short alert title
-        message: human-readable explanation
-        severity: "info" | "warning" | "high" | "critical"
-        source: module ("audit", "ransomware", "system", ...)
-    """
-
     alert = {
         "title": title,
         "message": message,
         "severity": severity,
         "source": source,
-        "status": "active",  # Default status for new alerts
+        "status": "active",
         "timestamp": datetime.utcnow().isoformat() + "Z",
     }
 
-    # ---------------------------------------------------------
-    # 1️⃣ SAVE TO DATABASE
-    # ---------------------------------------------------------
+    # 1) Save to DB
     try:
         db = current_app.config["DB"]
         db["system_alerts"].insert_one(alert)
     except Exception as e:
-        print(f"⚠️ Failed to store alert in DB: {e}")
+        print(f"Failed to store alert in DB: {e}")
 
-    # ---------------------------------------------------------
-    # 2️⃣ EMAIL NOTIFICATION (High severity only)
-    # ---------------------------------------------------------
+    # 2) Email for high/critical
     try:
         if severity in ["high", "critical"]:
             send_security_email(title, message)
     except Exception as e:
-        print(f"⚠️ Email alert failed: {e}")
+        print(f"Email alert failed: {e}")
 
-    # ---------------------------------------------------------
-    # 3️⃣ REAL-TIME WEBSOCKET EMIT
-    # ---------------------------------------------------------
+    # 3) Realtime socket
     try:
         if socketio_instance:
             socketio_instance.emit("new_alert", alert)
-            print(f"🚨 REAL-TIME ALERT SENT → {alert}")
+            print(f"Realtime alert sent -> {alert}")
         else:
-            print("⚠️ WebSocket not initialized. (Skipping realtime alert)")
+            print("WebSocket not initialized. Skipping realtime alert.")
     except Exception as e:
-        print(f"⚠️ SocketIO broadcast failed: {e}")
+        print(f"SocketIO broadcast failed: {e}")
+
+    # 4) Location enrichment from alert text
+    _track_location_from_alert(alert)
 
     return alert
