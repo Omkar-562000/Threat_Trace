@@ -1,6 +1,6 @@
 // frontend/src/components/ui/TopNavbar.jsx
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import socket from "../../utils/socket";
 import Toast from "./Toast";
@@ -12,28 +12,32 @@ import {
   MagnifyingGlassIcon,
   UserCircleIcon,
   Bars3Icon,
+  MoonIcon,
+  SunIcon,
 } from "@heroicons/react/24/outline";
+import { getPreferredTheme, toggleTheme } from "../../utils/theme";
 
-export default function TopNavbar({ onMobileMenuClick, mobileMenuOpen }) {
+export default function TopNavbar({ onMobileMenuClick }) {
   const navigate = useNavigate();
   const [toast, setToast] = useState(null);
   const [openUserMenu, setOpenUserMenu] = useState(false);
   const [openNotifications, setOpenNotifications] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [newAlert, setNewAlert] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [searchTerm, setSearchTerm] = useState("");
   const [profile, setProfile] = useState(() => readCachedProfile());
   const [viewportWidth, setViewportWidth] = useState(
     typeof window !== "undefined" ? window.innerWidth : 1280
   );
+  const [theme, setTheme] = useState(() => getPreferredTheme());
 
-  /* -------------------------------------------------------
-     SOCKET.IO : REAL-TIME ALERT HANDLING
-  ------------------------------------------------------- */
+  const notificationRef = useRef(null);
+  const userMenuRef = useRef(null);
+
   useEffect(() => {
     const handleAlert = (msg) => {
-      const alertText =
-        msg?.message || msg?.title || "⚠ Security Event Detected";
+      const alertText = msg?.message || msg?.title || "Security event detected";
 
       const entry = {
         message: alertText,
@@ -42,23 +46,17 @@ export default function TopNavbar({ onMobileMenuClick, mobileMenuOpen }) {
         time: new Date().toLocaleString(),
       };
 
-      // add to list
-      setNotifications((prev) => [entry, ...prev]);
-
-      // show toast
+      setNotifications((prev) => [entry, ...prev].slice(0, 50));
       setToast(alertText);
       setTimeout(() => setToast(null), 3500);
-
-      // bell icon pulse
       setNewAlert(true);
+      setUnreadCount((prev) => prev + 1);
     };
 
-    // listeners
     socket.on("new_alert", handleAlert);
     socket.on("tamper_alert", handleAlert);
     socket.on("ransomware_alert", handleAlert);
 
-    // cleanup to prevent double listening
     return () => {
       socket.off("new_alert", handleAlert);
       socket.off("tamper_alert", handleAlert);
@@ -75,7 +73,7 @@ export default function TopNavbar({ onMobileMenuClick, mobileMenuOpen }) {
           setProfile(res.profile);
         }
       } catch {
-        // fallback to cached profile only
+        // Use cached profile only.
       }
     };
     loadProfile();
@@ -85,7 +83,6 @@ export default function TopNavbar({ onMobileMenuClick, mobileMenuOpen }) {
     const handleResize = () => {
       const w = window.innerWidth;
       setViewportWidth(w);
-      // Close floating menus when switching to very small screens
       if (w < 640) {
         setOpenNotifications(false);
         setOpenUserMenu(false);
@@ -95,6 +92,32 @@ export default function TopNavbar({ onMobileMenuClick, mobileMenuOpen }) {
     handleResize();
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (notificationRef.current && !notificationRef.current.contains(event.target)) {
+        setOpenNotifications(false);
+      }
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target)) {
+        setOpenUserMenu(false);
+      }
+    };
+
+    const handleEscape = (event) => {
+      if (event.key === "Escape") {
+        setOpenNotifications(false);
+        setOpenUserMenu(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleEscape);
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleEscape);
+    };
   }, []);
 
   const isTiny = viewportWidth < 480;
@@ -115,22 +138,16 @@ export default function TopNavbar({ onMobileMenuClick, mobileMenuOpen }) {
         sticky top-0 z-40
       "
     >
-      {/* Toast */}
       {toast && <Toast message={toast} onClose={() => setToast(null)} />}
 
-      {/* -------------------------------------------------------
-         MOBILE MENU BUTTON (Left side on mobile)
-      ------------------------------------------------------- */}
       <button
         onClick={onMobileMenuClick}
         className="lg:hidden p-2 bg-white/10 rounded-lg border border-white/20 hover:bg-white/20 transition"
+        aria-label="Open navigation menu"
       >
         <Bars3Icon className="h-6 w-6 text-cyberNeon" />
       </button>
 
-      {/* -------------------------------------------------------
-         SEARCH BAR (Hidden on small mobile, visible on tablet+)
-      ------------------------------------------------------- */}
       <form
         className="
           flex items-center gap-2 md:gap-3 bg-white/10 px-2 sm:px-3 md:px-4 py-1.5 sm:py-2 rounded-xl
@@ -142,7 +159,7 @@ export default function TopNavbar({ onMobileMenuClick, mobileMenuOpen }) {
         <MagnifyingGlassIcon className="h-4 w-4 md:h-5 md:w-5 text-cyberNeon flex-shrink-0" />
         {showSearchInput && (
           <input
-            placeholder={isTiny ? "Search" : "Search..."}
+            placeholder={isTiny ? "Search" : "Search logs, IP, user..."}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="bg-transparent w-full min-w-0 focus:outline-none text-white placeholder-gray-300 text-xs sm:text-sm md:text-base"
@@ -150,25 +167,39 @@ export default function TopNavbar({ onMobileMenuClick, mobileMenuOpen }) {
         )}
       </form>
 
-      {/* -------------------------------------------------------
-         RIGHT ACTIONS
-      ------------------------------------------------------- */}
       <div className="flex items-center gap-1 sm:gap-3 md:gap-4 ml-auto">
+        <button
+          type="button"
+          className="p-1.5 rounded-lg hover:bg-white/10 border border-white/10 transition"
+          onClick={() => setTheme((prev) => toggleTheme(prev))}
+          aria-label={`Switch to ${theme === "light" ? "dark" : "light"} mode`}
+          title={`Switch to ${theme === "light" ? "dark" : "light"} mode`}
+        >
+          {theme === "light" ? (
+            <MoonIcon className="h-5 w-5 sm:h-6 sm:w-6 text-cyberNeon" />
+          ) : (
+            <SunIcon className="h-5 w-5 sm:h-6 sm:w-6 text-cyberNeon" />
+          )}
+        </button>
 
-        {/* -------------------------------------------------------
-           ALERT BELL + DROPDOWN
-        ------------------------------------------------------- */}
-        <div className="relative">
+        <div className="relative" ref={notificationRef}>
           <button
             type="button"
             className="relative p-1 rounded-lg hover:bg-white/10 transition"
             onClick={() => {
               setNewAlert(false);
+              setUnreadCount(0);
               setOpenNotifications((s) => !s);
               setOpenUserMenu(false);
             }}
+            aria-label="Open notifications"
           >
             <BellIcon className="h-5 w-5 sm:h-6 sm:w-6 md:h-7 md:w-7 text-cyberNeon hover:text-cyberPurple transition" />
+            {unreadCount > 0 && (
+              <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
+                {unreadCount > 99 ? "99+" : unreadCount}
+              </span>
+            )}
           </button>
 
           {newAlert && (
@@ -178,22 +209,30 @@ export default function TopNavbar({ onMobileMenuClick, mobileMenuOpen }) {
             </>
           )}
 
-          {/* Dropdown */}
           {openNotifications && (
             <div
               className="
-                absolute right-0 mt-2 w-[min(92vw,20rem)] glass-cyber p-3
-                rounded-xl border border-white/20 shadow-xl z-50 max-h-72 overflow-y-auto
+                absolute right-0 mt-2 w-[min(92vw,22rem)] glass-cyber p-3
+                rounded-xl border border-white/20 shadow-xl z-50 max-h-80 overflow-y-auto
               "
             >
-              <h3 className="font-semibold text-white mb-2 text-sm md:text-base">Recent Alerts</h3>
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="font-semibold text-white text-sm md:text-base">Recent Alerts</h3>
+                <button
+                  type="button"
+                  className="text-[11px] px-2 py-1 rounded border border-white/20 text-gray-300 hover:bg-white/10"
+                  onClick={() => setNotifications([])}
+                >
+                  Clear
+                </button>
+              </div>
 
               {notifications.length === 0 ? (
                 <p className="text-gray-300 text-xs md:text-sm">No alerts yet.</p>
               ) : (
                 notifications.map((n, i) => (
                   <div
-                    key={i}
+                    key={`${n.time}-${i}`}
                     className="
                       p-2 mb-2 rounded-lg bg-white/10 border border-white/10
                       text-gray-200 text-xs md:text-sm cursor-pointer hover:bg-white/15
@@ -222,10 +261,7 @@ export default function TopNavbar({ onMobileMenuClick, mobileMenuOpen }) {
           )}
         </div>
 
-        {/* -------------------------------------------------------
-           USER MENU DROPDOWN
-        ------------------------------------------------------- */}
-        <div className="relative">
+        <div className="relative" ref={userMenuRef}>
           <button
             onClick={() => {
               setOpenUserMenu((s) => !s);
@@ -236,6 +272,7 @@ export default function TopNavbar({ onMobileMenuClick, mobileMenuOpen }) {
               px-2 sm:px-2.5 md:px-3 py-1.5 md:py-2 rounded-xl hover:border-cyberNeon/40
               transition-all text-white
             "
+            aria-label="Open profile menu"
           >
             {profile?.avatar_url ? (
               <img

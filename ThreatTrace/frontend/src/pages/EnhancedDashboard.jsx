@@ -44,6 +44,7 @@ export default function EnhancedDashboard() {
   const [activityFeed, setActivityFeed] = useState([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
+  const [lastUpdated, setLastUpdated] = useState(null);
 
   // ============================================================
   // FETCH ALL DASHBOARD DATA
@@ -77,6 +78,7 @@ export default function EnhancedDashboard() {
       setSeverityStats(severity.data.data || {});
       setDashboardStats(stats.data.stats || {});
       setTopThreats(threats.data.threats || []);
+      setLastUpdated(new Date());
     } catch (error) {
       console.error("Dashboard data fetch error:", error);
       setToast({
@@ -230,7 +232,7 @@ export default function EnhancedDashboard() {
   // ============================================================
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-violet-900">
+      <div className="flex items-center justify-center min-h-[70vh] bg-gradient-to-br from-gray-900/60 via-purple-900/40 to-violet-900/40 rounded-2xl border border-white/10">
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-white text-lg font-semibold">Loading Dashboard...</p>
@@ -244,7 +246,7 @@ export default function EnhancedDashboard() {
   // RENDER DASHBOARD
   // ============================================================
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-violet-900 p-4 md:p-6 lg:p-8">
+    <div className="bg-gradient-to-br from-gray-900/40 via-purple-900/20 to-violet-900/20 p-4 md:p-6 lg:p-8 rounded-2xl border border-white/10">
       {/* Toast Notifications */}
       {toast && (
         <Toast
@@ -256,14 +258,26 @@ export default function EnhancedDashboard() {
 
       {/* Header */}
       <div className="mb-6 md:mb-8">
-        <h1 className="text-3xl md:text-4xl font-bold text-white mb-2 flex items-center gap-3">
+        <h1 className="text-2xl md:text-4xl font-bold text-white mb-2 flex items-center gap-3">
           <ShieldCheckIcon className="w-8 h-8 md:w-10 md:h-10 text-purple-400" />
           ThreatTrace Dashboard
         </h1>
-        <p className="text-gray-400 text-sm md:text-base flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-          Real-time threat monitoring and analytics
-        </p>
+        <div className="flex flex-wrap items-center gap-3 text-gray-400 text-sm md:text-base">
+          <p className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+            Real-time threat monitoring and analytics
+          </p>
+          <span className="hidden sm:inline text-gray-600">|</span>
+          <p className="text-xs md:text-sm">
+            Last update: {lastUpdated ? lastUpdated.toLocaleTimeString() : "just now"}
+          </p>
+        </div>
+      </div>
+
+      <div className="mb-6 flex flex-wrap gap-2">
+        <button className="cyber-btn" onClick={() => navigate("/alerts")}>Review Alerts</button>
+        <button className="cyber-btn bg-cyberNeon/20 hover:bg-cyberNeon/30" onClick={() => navigate("/reports")}>Generate Report</button>
+        <button className="cyber-btn bg-white/10 hover:bg-white/20 border border-white/20" onClick={() => navigate("/locations")}>Open Threat Map</button>
       </div>
 
       {/* Stats Grid */}
@@ -405,7 +419,7 @@ export default function EnhancedDashboard() {
 
       {/* Footer */}
       <div className="mt-8 text-center text-gray-500 text-sm">
-        <p>🛡️ ThreatTrace - Real-Time Automated Security Monitoring</p>
+                <p>ThreatTrace - Real-time automated security monitoring</p>
         <p className="text-xs mt-1">Last updated: {new Date().toLocaleTimeString()}</p>
       </div>
     </div>
