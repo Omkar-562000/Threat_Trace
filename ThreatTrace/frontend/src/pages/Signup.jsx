@@ -49,10 +49,10 @@ export default function Signup() {
 
     return (
         <div className="min-h-screen flex items-center justify-center relative">
-            <CyberpunkBackground />
+            <CyberpunkBackground bgImage="logo-icon.png" />
             <div className="glass-cyber w-[400px] p-8 shadow-neon relative z-10">
                 <div className="flex justify-center mb-6">
-                    <Logo variant="full" size="lg" />
+                    <Logo variant="logo" size="8xl" />
                 </div>
                 <h2 className="text-3xl cyber-gradient-text text-center mb-6">
                     Create Account

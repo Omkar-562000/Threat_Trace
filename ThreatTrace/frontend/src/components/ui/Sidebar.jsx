@@ -80,12 +80,12 @@ export default function Sidebar({ open, setOpen, mobileMenuOpen, setMobileMenuOp
             ${expanded ? "opacity-100" : "opacity-0 w-0"}
           `}
         >
-          {expanded && <Logo variant="full" size="md" />}
+          {expanded && <Logo variant="full" size="40xl" />}
         </div>
         
         {!expanded && (
           <div className="flex justify-center w-full">
-            <Logo variant="icon" size="sm" />
+            <Logo variant="logo" size="40xl" />
           </div>
         )}
 

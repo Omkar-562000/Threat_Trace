@@ -3,11 +3,20 @@
  * Animated Cyberpunk Background for Auth Pages
  * Features: Animated particles, gradient overlay, circuit patterns
  */
-export default function CyberpunkBackground() {
+export default function CyberpunkBackground({ bgImage }) {
   return (
     <div className="fixed inset-0 -z-10 overflow-hidden">
-      {/* Base gradient */}
-      <div className="absolute inset-0 bg-gradient-to-br from-[#0a0f1f] via-[#1a0b2e] to-[#0a0f1f]" />
+      {/* Base background image + gradient */}
+      <div
+        className="absolute inset-0 bg-gradient-to-br from-[#0a0f1f] via-[#1a0b2e] to-[#0a0f1f]"
+        style={bgImage ? {
+          backgroundImage: `url(/images/backgrounds/${bgImage})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+          opacity: 0.2
+        } : {}}
+      />
       
       {/* Animated gradient orbs */}
       <div className="absolute top-0 -left-20 w-96 h-96 bg-purple-600/30 rounded-full blur-3xl animate-pulse-slow" />
