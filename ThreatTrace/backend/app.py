@@ -25,7 +25,6 @@ from flask_mail import Mail
 from flask_jwt_extended import JWTManager
 from flask_bcrypt import Bcrypt
 from flask_socketio import SocketIO
-from apscheduler.schedulers.background import BackgroundScheduler
 
 from config import Config
 from database.db_config import init_db
@@ -85,15 +84,7 @@ app.config["DB"] = db
 
 
 # ============================================================
-# 5️⃣ APSCHEDULER
-# ============================================================
-scheduler = BackgroundScheduler()
-scheduler.start()
-app.config["SCHEDULER"] = scheduler
-
-
-# ============================================================
-# 6️⃣ IMPORT & REGISTER ROUTES
+# 5️⃣ IMPORT & REGISTER ROUTES
 # ============================================================
 
 # Import blueprints
@@ -157,14 +148,14 @@ def index():
 
 
 # ============================================================
-# 8️⃣ GRACEFUL SHUTDOWN
+# 7️⃣ GRACEFUL SHUTDOWN
 # ============================================================
 def shutdown_handler(signum=None, frame=None):
     print("\n⚠️ Shutting down ThreatTrace backend...")
 
     try:
-        if scheduler.running:
-            scheduler.shutdown(wait=False)
+        from scheduler import stop_scheduler
+        if stop_scheduler(app):
             print("🛑 Scheduler stopped.")
     except:
         print("⚠ Scheduler not running or already closed.")
@@ -178,7 +169,7 @@ signal.signal(signal.SIGTERM, shutdown_handler)
 
 
 # ============================================================
-# 9️⃣ RUN SERVER
+# 8️⃣ RUN SERVER
 # ============================================================
 if __name__ == "__main__":
     print("🚀 ThreatTrace backend running at http://127.0.0.1:5000")

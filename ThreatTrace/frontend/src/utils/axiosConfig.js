@@ -29,15 +29,22 @@ axiosInstance.interceptors.response.use(
   (error) => {
     // Only logout and redirect if it's a token authentication issue
     // Don't logout on permission errors (403) or other 401s from role checks
-    if (error.response?.status === 401) {
-      const errorMessage = error.response?.data?.message || '';
+    if (error.response?.status === 401 || error.response?.status === 422) {
+      const errorMessage =
+        error.response?.data?.message ||
+        error.response?.data?.msg ||
+        '';
       
       // Check if it's actually a token expiry/invalid token issue
       // vs a role-based permission issue
       const isTokenIssue = 
         errorMessage.includes('Token') ||
+        errorMessage.includes('token') ||
         errorMessage.includes('expired') ||
         errorMessage.includes('invalid') ||
+        errorMessage.includes('Subject must be a string') ||
+        errorMessage.includes('Not enough segments') ||
+        errorMessage.includes('Signature verification failed') ||
         errorMessage.includes('Authentication required') ||
         !localStorage.getItem('token'); // No token at all
       

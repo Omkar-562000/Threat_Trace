@@ -5,6 +5,11 @@ const API_ROOT = import.meta.env.VITE_API_BASE || "http://127.0.0.1:5000";
 const AUDIT_API = `${API_ROOT}/api/audit`;
 const SCHED_API = `${API_ROOT}/api/scheduler`;
 
+function authHeader() {
+  const token = localStorage.getItem("token");
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 /* ------------------------------------------------------
    JSON response handler (safe for text / HTML errors)
 ------------------------------------------------------ */
@@ -23,7 +28,10 @@ async function parseResponse(res) {
 export async function verifyByPath(filePath) {
   const res = await fetch(`${AUDIT_API}/verify-path`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...authHeader(),
+    },
     body: JSON.stringify({ log_path: filePath }),
   });
   return parseResponse(res);
@@ -38,6 +46,7 @@ export async function uploadAndVerify(file) {
 
   const res = await fetch(`${AUDIT_API}/upload-verify`, {
     method: "POST",
+    headers: authHeader(),
     body: form,
   });
   return parseResponse(res);
@@ -47,7 +56,9 @@ export async function uploadAndVerify(file) {
    FETCH AUDIT HISTORY (audit_routes.py /history)
 ------------------------------------------------------ */
 export async function getAuditHistory() {
-  const res = await fetch(`${AUDIT_API}/history`);
+  const res = await fetch(`${AUDIT_API}/history`, {
+    headers: authHeader(),
+  });
   return parseResponse(res);
 }
 
@@ -56,7 +67,8 @@ export async function getAuditHistory() {
 ------------------------------------------------------ */
 export async function getAuditReport(file_path) {
   const res = await fetch(
-    `${AUDIT_API}/report?file_path=${encodeURIComponent(file_path)}`
+    `${AUDIT_API}/report?file_path=${encodeURIComponent(file_path)}`,
+    { headers: authHeader() }
   );
   return parseResponse(res);
 }

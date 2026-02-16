@@ -150,7 +150,15 @@ export default function Audit() {
               type="number"
               className="cyber-input w-32"
               value={schedInterval}
-              onChange={(e) => setSchedInterval(Number(e.target.value))}
+              onChange={(e) => {
+                const raw = e.target.value;
+                if (raw === "") {
+                  setSchedInterval("");
+                  return;
+                }
+                const next = Number(raw);
+                setSchedInterval(Number.isFinite(next) ? next : "");
+              }}
               min="60"
             />
 
@@ -159,11 +167,25 @@ export default function Audit() {
               disabled={schedRunning}
               onClick={async () => {
                 try {
-                  await schedulerStart(schedInterval);
-                  pushToast("Scheduler started", "success");
-                  await loadSchedulerStatus();
+                  const intervalNum = Number(schedInterval);
+                  if (!Number.isFinite(intervalNum)) {
+                    pushToast("Enter a valid interval", "error");
+                    return;
+                  }
+                  if (intervalNum < 60 || intervalNum > 86400) {
+                    pushToast("Interval must be between 60 and 86400 seconds", "error");
+                    return;
+                  }
+
+                  const res = await schedulerStart(intervalNum);
+                  if (res.status === "success") {
+                    pushToast("Scheduler started", "success");
+                    await loadSchedulerStatus();
+                  } else {
+                    pushToast(res.message || "Failed to start scheduler", "error");
+                  }
                 } catch (err) {
-                  pushToast(err.response?.data?.message || "Failed to start scheduler", "error");
+                  pushToast(err.message || "Failed to start scheduler", "error");
                 }
               }}
             >
@@ -175,11 +197,15 @@ export default function Audit() {
               disabled={!schedRunning}
               onClick={async () => {
                 try {
-                  await schedulerStop();
-                  pushToast("Scheduler stopped", "success");
-                  await loadSchedulerStatus();
+                  const res = await schedulerStop();
+                  if (res.status === "success") {
+                    pushToast("Scheduler stopped", "success");
+                    await loadSchedulerStatus();
+                  } else {
+                    pushToast(res.message || "Failed to stop scheduler", "error");
+                  }
                 } catch (err) {
-                  pushToast(err.response?.data?.message || "Failed to stop scheduler", "error");
+                  pushToast(err.message || "Failed to stop scheduler", "error");
                 }
               }}
             >
@@ -190,11 +216,15 @@ export default function Audit() {
               className="cyber-btn bg-blue-600 hover:bg-blue-700"
               onClick={async () => {
                 try {
-                  await schedulerRunNow();
-                  pushToast("Manual scan triggered", "success");
-                  await loadHistory();
+                  const res = await schedulerRunNow();
+                  if (res.status === "success") {
+                    pushToast("Manual scan triggered", "success");
+                    await loadHistory();
+                  } else {
+                    pushToast(res.message || "Failed to run scan", "error");
+                  }
                 } catch (err) {
-                  pushToast(err.response?.data?.message || "Failed to run scan", "error");
+                  pushToast(err.message || "Failed to run scan", "error");
                 }
               }}
             >

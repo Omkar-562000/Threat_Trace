@@ -88,7 +88,7 @@ export default function Ransomware() {
           entropy: result.entropy,
           suspicious: result.suspicious,
           reason: result.reason?.join(", ") || "None",
-          timestamp: new Date().toLocaleString(),
+          scan_time: new Date().toISOString(),
         };
 
         // Add to UI list
@@ -194,7 +194,11 @@ export default function Ransomware() {
                 </td>
 
                 <td className="p-3">{log.reason}</td>
-                <td className="p-3">{log.timestamp}</td>
+                <td className="p-3">
+                  {log.scan_time
+                    ? new Date(log.scan_time).toLocaleString()
+                    : (log.timestamp || "-")}
+                </td>
               </tr>
             ))}
           </tbody>

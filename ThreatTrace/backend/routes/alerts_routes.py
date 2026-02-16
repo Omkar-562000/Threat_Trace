@@ -34,6 +34,7 @@ def get_alerts_collection():
 # 1️⃣ GET ALL ALERTS WITH FILTERS & PAGINATION
 # ============================================================
 @alerts_bp.route('/', methods=['GET'])
+@role_required('personal', 'corporate', 'technical')
 def get_alerts():
     """
     Get all alerts with optional filters and pagination
@@ -117,6 +118,7 @@ def get_alerts():
 # 2️⃣ GET ALERT STATISTICS
 # ============================================================
 @alerts_bp.route('/stats', methods=['GET'])
+@role_required('personal', 'corporate', 'technical')
 def get_alert_stats():
     """
     Get alert statistics
@@ -176,6 +178,7 @@ def get_alert_stats():
 # 3️⃣ ACKNOWLEDGE SINGLE ALERT
 # ============================================================
 @alerts_bp.route('/<alert_id>/acknowledge', methods=['POST'])
+@role_required('personal', 'corporate', 'technical')
 def acknowledge_alert(alert_id):
     """
     Acknowledge a single alert
@@ -234,6 +237,7 @@ def acknowledge_alert(alert_id):
 # 4️⃣ RESOLVE SINGLE ALERT
 # ============================================================
 @alerts_bp.route('/<alert_id>/resolve', methods=['POST'])
+@role_required('personal', 'corporate', 'technical')
 def resolve_alert(alert_id):
     """
     Resolve a single alert
@@ -340,6 +344,7 @@ def delete_alert(alert_id):
 # 6️⃣ BULK ACKNOWLEDGE ALERTS
 # ============================================================
 @alerts_bp.route('/bulk/acknowledge', methods=['POST'])
+@role_required('personal', 'corporate', 'technical')
 def bulk_acknowledge_alerts():
     """
     Acknowledge multiple alerts at once
@@ -401,6 +406,7 @@ def bulk_acknowledge_alerts():
 # 7️⃣ BULK RESOLVE ALERTS
 # ============================================================
 @alerts_bp.route('/bulk/resolve', methods=['POST'])
+@role_required('personal', 'corporate', 'technical')
 def bulk_resolve_alerts():
     """
     Resolve multiple alerts at once

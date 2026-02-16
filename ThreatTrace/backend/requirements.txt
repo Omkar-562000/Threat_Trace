@@ -2,6 +2,10 @@ Flask
 Flask-Cors
 Flask-SocketIO
 Flask-JWT-Extended
+Flask-Mail
+Flask-Bcrypt
+APScheduler
+eventlet
 pymongo
 python-dotenv
 pandas

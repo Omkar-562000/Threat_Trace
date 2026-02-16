@@ -1,5 +1,5 @@
 from functools import wraps
-from flask_jwt_extended import verify_jwt_in_request, get_jwt_identity
+from flask_jwt_extended import verify_jwt_in_request, get_jwt, get_jwt_identity
 from flask import jsonify
 
 def role_required(*allowed_roles):
@@ -8,8 +8,13 @@ def role_required(*allowed_roles):
         def wrapper(*args, **kwargs):
             verify_jwt_in_request()
 
+            claims = get_jwt() or {}
             identity = get_jwt_identity()
-            role = identity.get("role") if isinstance(identity, dict) else None
+            role = claims.get("role")
+
+            # Backward compatibility for older tokens where role was placed in identity.
+            if role is None and isinstance(identity, dict):
+                role = identity.get("role")
 
             if role not in allowed_roles:
                 return jsonify({

@@ -92,12 +92,12 @@ def login():
 
         # Create JWT
         token = create_access_token(
-            identity={
-                "user_id": str(user["_id"]),
+            identity=str(user["_id"]),
+            additional_claims={
                 "role": user.get("role", "personal")
             },
             expires_delta=timedelta(hours=12)
-        )   
+        )
         return jsonify({
             "status": "success",
             "token": token,

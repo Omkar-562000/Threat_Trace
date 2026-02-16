@@ -2,6 +2,7 @@
 // ThreatTrace — System Logs API Client (Final Polished Build)
 
 import axios from "axios";
+import axiosInstance from "../utils/axiosConfig";
 
 // ----------------------------------------------------------
 // Base URL
@@ -83,10 +84,14 @@ export async function exportLogs(format = "csv", filters = {}) {
   const url = `${LOGS_API}/export?${params}`;
 
   try {
-    return await axios.get(url, { responseType: "blob" });
+    return await axiosInstance.get(url, { responseType: "blob" });
   } catch (error) {
     console.error("❌ exportLogs error:", error);
-    throw new Error("Failed to export logs");
+    const backendMessage =
+      error?.response?.data?.message ||
+      error?.response?.data?.msg ||
+      "Failed to export logs";
+    throw new Error(backendMessage);
   }
 }
 

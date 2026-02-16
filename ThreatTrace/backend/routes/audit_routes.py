@@ -6,7 +6,6 @@ from datetime import datetime
 from werkzeug.utils import secure_filename
 
 from utils.audit_service import verify_file_integrity
-from utils.email_alerts import send_tamper_email
 from utils.role_guard import role_required
 
 
@@ -26,6 +25,7 @@ def _is_allowed_file(filename: str) -> bool:
 # 1️⃣ VERIFY BY SERVER FILE PATH (POST /verify-path)
 # ============================================================
 @audit_bp.route("/verify-path", methods=["POST"])
+@role_required("personal", "corporate", "technical")
 def verify_path():
     try:
         data = request.get_json(force=True, silent=True) or {}
@@ -42,17 +42,6 @@ def verify_path():
 
         report = verify_file_integrity(log_path, db, sio)
 
-        # Email (best-effort)
-        if report.get("tampered"):
-            try:
-                send_tamper_email(
-                    report["file_path"],
-                    report["last_hash"],
-                    report.get("generated_at", datetime.utcnow().isoformat() + "Z"),
-                )
-            except Exception:
-                pass
-
         return jsonify(report), 200
 
     except Exception as e:
@@ -64,6 +53,7 @@ def verify_path():
 # 2️⃣ UPLOAD → VERIFY (POST /upload-verify)
 # ============================================================
 @audit_bp.route("/upload-verify", methods=["POST"])
+@role_required("personal", "corporate", "technical")
 def upload_verify():
     saved_path = None
     try:
@@ -101,13 +91,6 @@ def upload_verify():
         sio = current_app.config["SOCKETIO"]
         report = verify_file_integrity(saved_path, db, sio)
 
-        # email alert if tampered
-        if report.get("tampered"):
-            try:
-                send_tamper_email(report["file_path"], report["last_hash"], report["generated_at"])
-            except Exception:
-                pass
-
         return jsonify(report), 200
 
     except Exception as e:
@@ -126,6 +109,7 @@ def upload_verify():
 # 3️⃣ AUDIT HISTORY (GET /history)
 # ============================================================
 @audit_bp.route("/history", methods=["GET"])
+@role_required("personal", "corporate", "technical")
 def history():
     try:
         db = current_app.config["DB"]
@@ -143,6 +127,7 @@ def history():
 # 4️⃣ DETAILED REPORT (GET /report)
 # ============================================================
 @audit_bp.route("/report", methods=["GET"])
+@role_required("personal", "corporate", "technical")
 def audit_report():
     try:
         file_path = request.args.get("file_path")

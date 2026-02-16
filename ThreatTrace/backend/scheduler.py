@@ -37,7 +37,12 @@ def run_periodic_checks(app):
 def init_scheduler(app, interval_seconds: int = 300):
     global _scheduler
     if _scheduler is not None:
-        return _scheduler
+        current_interval = app.config.get("SCHEDULER_INTERVAL")
+        if current_interval == interval_seconds:
+            return _scheduler
+        # Reconfigure scheduler when interval changes.
+        stop_scheduler(app)
+
     _scheduler = BackgroundScheduler()
     _scheduler.add_job(func=lambda: run_periodic_checks(app),
                        trigger="interval", seconds=interval_seconds,
@@ -55,6 +60,7 @@ def stop_scheduler(app):
         _scheduler.shutdown(wait=False)
         _scheduler = None
         app.config.pop("SCHEDULER", None)
+        app.config.pop("SCHEDULER_INTERVAL", None)
         print("⚠️ Scheduler stopped.")
         return True
     return False
