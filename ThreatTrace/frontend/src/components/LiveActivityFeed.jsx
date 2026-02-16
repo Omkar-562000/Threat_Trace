@@ -133,7 +133,7 @@ export default function LiveActivityFeed({ activities = [], maxItems = 50 }) {
         ) : (
           items.map((activity, index) => (
             <div
-              key={activity.id || `${activity.timestamp}-${index}`}
+              key={`${activity.id || activity.timestamp || "event"}-${index}`}
               className={`
                 p-3 rounded-lg border backdrop-blur-sm
                 ${getSeverityColor(activity.severity)}

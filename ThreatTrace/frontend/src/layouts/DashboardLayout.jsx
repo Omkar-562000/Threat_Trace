@@ -11,6 +11,9 @@ export default function DashboardLayout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [toast, setToast] = useState(null);
+  const [viewportWidth, setViewportWidth] = useState(
+    typeof window !== "undefined" ? window.innerWidth : 1280
+  );
 
   /* ---------------------------------------------------------
      GLOBAL REAL-TIME ALERT LISTENERS
@@ -50,14 +53,19 @@ export default function DashboardLayout({ children }) {
   --------------------------------------------------------- */
   useEffect(() => {
     const handleResize = () => {
+      setViewportWidth(window.innerWidth);
       if (window.innerWidth >= 1024) {
         setMobileMenuOpen(false);
       }
     };
 
+    handleResize();
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
+
+  const isDesktop = viewportWidth >= 1024;
+  const sidebarOffset = isDesktop ? (sidebarOpen ? "256px" : "80px") : "0";
 
   return (
     <div className="flex h-screen overflow-hidden bg-cyberDark relative">
@@ -97,7 +105,7 @@ export default function DashboardLayout({ children }) {
       <div
         className="flex flex-col flex-1 transition-all duration-300 w-full"
         style={{
-          marginLeft: window.innerWidth >= 1024 ? (sidebarOpen ? "256px" : "80px") : "0"
+          marginLeft: sidebarOffset,
         }}
       >
         {/* ---------------------------------------------------------
@@ -106,7 +114,7 @@ export default function DashboardLayout({ children }) {
         <header
           className="fixed top-0 right-0 z-20 transition-all duration-300 w-full lg:w-auto"
           style={{
-            left: window.innerWidth >= 1024 ? (sidebarOpen ? "256px" : "80px") : "0"
+            left: sidebarOffset,
           }}
         >
           <TopNavbar

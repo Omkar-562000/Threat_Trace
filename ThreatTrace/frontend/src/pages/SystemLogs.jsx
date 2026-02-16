@@ -1,5 +1,6 @@
 // frontend/src/pages/SystemLogs.jsx
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import TimelineChart from "../components/TimelineChart"; // keep if available, else remove
 import Toast from "../components/ui/Toast";
 import {
@@ -11,6 +12,7 @@ import socket from "../utils/socket";
 import { hasRole } from "../utils/role";
 
 export default function SystemLogs() {
+  const [searchParams] = useSearchParams();
   /* ===============================
      States
   =============================== */
@@ -122,6 +124,17 @@ export default function SystemLogs() {
     fetchInitial();
     fetchLevels();
   }, [fetchInitial, fetchLevels]);
+
+  // Allow global navbar search to prefill System Logs filters via query params.
+  useEffect(() => {
+    const qpQ = searchParams.get("q") || "";
+    const qpLevel = searchParams.get("level") || "";
+    const qpSource = searchParams.get("source") || "";
+
+    if (qpQ) setQ(qpQ);
+    if (qpLevel) setLevel(qpLevel);
+    if (qpSource) setSource(qpSource);
+  }, [searchParams]);
 
   /* ===============================
      Filtering

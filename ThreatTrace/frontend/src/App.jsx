@@ -14,7 +14,6 @@ import ProtectedRoute from "./utils/ProtectedRoute";
 // Dashboard Feature Pages
 import Alerts from "./pages/Alerts";
 import Audit from "./pages/Audit";
-import Dashboard from "./pages/Dashboard";
 import EnhancedDashboard from "./pages/EnhancedDashboard";
 import Ransomware from "./pages/Ransomware";
 import Reports from "./pages/Reports";
@@ -37,7 +36,7 @@ export default function App() {
         <Route
           path="/dashboard"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requiredFeature="dashboard">
               <DashboardLayout>
                 <EnhancedDashboard />
               </DashboardLayout>
@@ -48,7 +47,7 @@ export default function App() {
         <Route
           path="/ransomware"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requiredFeature="ransomware">
               <DashboardLayout>
                 <Ransomware />
               </DashboardLayout>
@@ -59,7 +58,7 @@ export default function App() {
         <Route
           path="/audit"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requiredFeature="audit">
               <DashboardLayout>
                 <Audit />
               </DashboardLayout>
@@ -70,7 +69,7 @@ export default function App() {
         <Route
           path="/alerts"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requiredFeature="alerts">
               <DashboardLayout>
                 <Alerts />
               </DashboardLayout>
@@ -81,7 +80,7 @@ export default function App() {
         <Route
           path="/reports"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requiredFeature="reports">
               <DashboardLayout>
                 <Reports />
               </DashboardLayout>
@@ -92,7 +91,7 @@ export default function App() {
         <Route
           path="/logs"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requiredFeature="logs">
               <DashboardLayout>
                 <SystemLogs />
               </DashboardLayout>
@@ -103,7 +102,7 @@ export default function App() {
         <Route
           path="/settings"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requiredFeature="settings">
               <DashboardLayout>
                 <Settings />
               </DashboardLayout>
@@ -114,7 +113,7 @@ export default function App() {
         <Route
           path="/locations"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requiredFeature="locations">
               <DashboardLayout>
                 <LocationTracking />
               </DashboardLayout>
@@ -125,7 +124,7 @@ export default function App() {
         <Route
           path="/security"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requiredFeature="security_control">
               <DashboardLayout>
                 <SecurityControl />
               </DashboardLayout>

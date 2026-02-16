@@ -22,6 +22,26 @@ export async function getCanaryTriggers() {
   return res.data;
 }
 
+export async function getCanaryAllowlist() {
+  const res = await axiosInstance.get(`${CANARY_API}/allowlist`);
+  return res.data;
+}
+
+export async function addCanaryAllowlistEntry({ cidr, label }) {
+  const res = await axiosInstance.post(`${CANARY_API}/allowlist`, { cidr, label });
+  return res.data;
+}
+
+export async function deleteCanaryAllowlistEntry(entryId) {
+  const res = await axiosInstance.delete(`${CANARY_API}/allowlist/${entryId}`);
+  return res.data;
+}
+
+export async function getCanaryChallengeResponses() {
+  const res = await axiosInstance.get(`${CANARY_API}/challenge-responses`);
+  return res.data;
+}
+
 export function buildCanaryTrapUrl(token) {
   if (!token) return "";
   return `${CANARY_API}/trap/${token}`;
@@ -31,5 +51,9 @@ export default {
   createCanaryAsset,
   getCanaryAssets,
   getCanaryTriggers,
+  getCanaryAllowlist,
+  addCanaryAllowlistEntry,
+  deleteCanaryAllowlistEntry,
+  getCanaryChallengeResponses,
   buildCanaryTrapUrl,
 };

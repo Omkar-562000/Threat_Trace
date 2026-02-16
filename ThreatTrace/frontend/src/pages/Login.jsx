@@ -42,9 +42,23 @@ export default function Login() {
 
       const token = res.data.token;
       const role = res.data.user?.role || "personal";
+      const user = res.data.user || {};
 
       localStorage.setItem("token", token);
       localStorage.setItem("role", role);
+      localStorage.setItem("user_profile", JSON.stringify({
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        display_name: user.profile?.display_name || user.name || "User",
+        phone: user.profile?.phone || "",
+        organization: user.profile?.organization || "",
+        job_title: user.profile?.job_title || "",
+        timezone: user.profile?.timezone || "",
+        bio: user.profile?.bio || "",
+        avatar_url: user.profile?.avatar_url || "",
+      }));
 
       navigate("/dashboard");
 

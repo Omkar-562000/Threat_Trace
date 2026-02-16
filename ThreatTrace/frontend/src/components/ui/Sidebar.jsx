@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { NavLink } from "react-router-dom";
 import socket from "../../utils/socket";
+import { hasFeature } from "../../utils/role";
 import Logo from "./Logo";
 
 import {
@@ -48,21 +49,23 @@ export default function Sidebar({ open, setOpen, mobileMenuOpen, setMobileMenuOp
      MENU ITEMS
   --------------------------------------------------------- */
   const menu = [
-    { to: "/dashboard", label: "Dashboard", icon: <HomeIcon className="h-6 w-6" /> },
-    { to: "/ransomware", label: "Ransomware", icon: <ShieldCheckIcon className="h-6 w-6" /> },
-    { to: "/audit", label: "Audit Logs", icon: <DocumentMagnifyingGlassIcon className="h-6 w-6" /> },
+    { to: "/dashboard", feature: "dashboard", label: "Dashboard", icon: <HomeIcon className="h-6 w-6" /> },
+    { to: "/ransomware", feature: "ransomware", label: "Ransomware", icon: <ShieldCheckIcon className="h-6 w-6" /> },
+    { to: "/audit", feature: "audit", label: "Audit Logs", icon: <DocumentMagnifyingGlassIcon className="h-6 w-6" /> },
     {
       to: "/alerts",
+      feature: "alerts",
       label: "Alerts",
       icon: <BellAlertIcon className="h-6 w-6" />,
       badge: alertCount,
     },
-    { to: "/reports", label: "Reports", icon: <InboxIcon className="h-6 w-6" /> },
-    { to: "/logs", label: "System Logs", icon: <ServerStackIcon className="h-6 w-6" /> },
-    { to: "/locations", label: "Locations", icon: <GlobeAltIcon className="h-6 w-6" /> },
-    { to: "/security", label: "Security Control", icon: <LockClosedIcon className="h-6 w-6" /> },
-    { to: "/settings", label: "Settings", icon: <Cog6ToothIcon className="h-6 w-6" /> },
+    { to: "/reports", feature: "reports", label: "Reports", icon: <InboxIcon className="h-6 w-6" /> },
+    { to: "/logs", feature: "logs", label: "System Logs", icon: <ServerStackIcon className="h-6 w-6" /> },
+    { to: "/locations", feature: "locations", label: "Locations", icon: <GlobeAltIcon className="h-6 w-6" /> },
+    { to: "/security", feature: "security_control", label: "Security Control", icon: <LockClosedIcon className="h-6 w-6" /> },
+    { to: "/settings", feature: "settings", label: "Settings", icon: <Cog6ToothIcon className="h-6 w-6" /> },
   ];
+  const visibleMenu = menu.filter((item) => hasFeature(item.feature));
 
   return (
     <aside
@@ -123,7 +126,7 @@ export default function Sidebar({ open, setOpen, mobileMenuOpen, setMobileMenuOp
       {/* MENU */}
       {/* -------------------------------------- */}
       <nav className="flex-1 mt-4 px-3 space-y-2 overflow-y-auto">
-        {menu.map((item) => (
+        {visibleMenu.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
@@ -176,8 +179,10 @@ export default function Sidebar({ open, setOpen, mobileMenuOpen, setMobileMenuOp
         <NavLink
           to="/"
           onClick={() => {
+            localStorage.removeItem("token");
             localStorage.removeItem("access_token");
             localStorage.removeItem("role");
+            localStorage.removeItem("user_profile");
             if (window.innerWidth < 1024) {
               setMobileMenuOpen(false);
             }

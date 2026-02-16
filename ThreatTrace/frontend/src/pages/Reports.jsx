@@ -6,7 +6,7 @@ import {
   generateSummaryReport,
 } from "../services/reportsService";
 import Toast from "../components/ui/Toast";
-import { hasRole } from "../utils/role";
+import { hasFeature } from "../utils/role";
 
 export default function Reports() {
   /* ===============================
@@ -24,7 +24,7 @@ export default function Reports() {
   const [report, setReport] = useState(null);
 
   // Role permissions
-  const canExport = hasRole(["corporate", "technical"]);
+  const canExport = hasFeature("reports_export");
 
   /* ===============================
      Toast Helper

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { hasRole } from "../utils/role";
+import { hasFeature } from "../utils/role";
 import Toast from "../components/ui/Toast";
 import {
   getBlockedIps,
@@ -9,14 +9,18 @@ import {
   unblockIp,
 } from "../services/securityService";
 import {
+  addCanaryAllowlistEntry,
   buildCanaryTrapUrl,
   createCanaryAsset,
+  deleteCanaryAllowlistEntry,
+  getCanaryAllowlist,
   getCanaryAssets,
+  getCanaryChallengeResponses,
   getCanaryTriggers,
 } from "../services/canaryService";
 
 export default function SecurityControl() {
-  const canManage = hasRole(["technical"]);
+  const canManage = hasFeature("security_control");
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
 
@@ -25,6 +29,10 @@ export default function SecurityControl() {
   const [auditEvents, setAuditEvents] = useState([]);
   const [canaryAssets, setCanaryAssets] = useState([]);
   const [canaryTriggers, setCanaryTriggers] = useState([]);
+  const [canaryAllowlist, setCanaryAllowlist] = useState([]);
+  const [challengeResponses, setChallengeResponses] = useState([]);
+  const [newCidr, setNewCidr] = useState("");
+  const [newLabel, setNewLabel] = useState("");
 
   const pushToast = (msg, severity = "info") => {
     setToast({ msg, severity });
@@ -43,11 +51,17 @@ export default function SecurityControl() {
         getCanaryAssets(),
         getCanaryTriggers(),
       ]);
+      const [allowRes, respRes] = await Promise.all([
+        getCanaryAllowlist(),
+        getCanaryChallengeResponses(),
+      ]);
       setBlockedIps(ips.blocked_ips || []);
       setQuarantinedUsers(users.users || []);
       setAuditEvents(trail.events || []);
       setCanaryAssets(assetsRes.assets || []);
       setCanaryTriggers(triggersRes.triggers || []);
+      setCanaryAllowlist(allowRes.entries || []);
+      setChallengeResponses(respRes.responses || []);
     } catch (error) {
       console.error("SecurityControl load error:", error);
       pushToast(error?.response?.data?.message || "Failed to load security control data", "error");
@@ -94,6 +108,32 @@ export default function SecurityControl() {
       loadAll();
     } catch (error) {
       pushToast(error?.response?.data?.message || "Failed to create canary trap", "error");
+    }
+  };
+
+  const handleAddAllowlist = async () => {
+    if (!newCidr.trim()) {
+      pushToast("Enter CIDR or IP first", "warning");
+      return;
+    }
+    try {
+      await addCanaryAllowlistEntry({ cidr: newCidr.trim(), label: newLabel.trim() || "Trusted Source" });
+      setNewCidr("");
+      setNewLabel("");
+      pushToast("Allowlist entry added", "success");
+      loadAll();
+    } catch (error) {
+      pushToast(error?.response?.data?.message || "Failed to add allowlist entry", "error");
+    }
+  };
+
+  const handleDeleteAllowlist = async (entryId) => {
+    try {
+      await deleteCanaryAllowlistEntry(entryId);
+      pushToast("Allowlist entry removed", "success");
+      loadAll();
+    } catch (error) {
+      pushToast(error?.response?.data?.message || "Failed to remove allowlist entry", "error");
     }
   };
 
@@ -153,6 +193,14 @@ export default function SecurityControl() {
         <div className="cyber-card text-center">
           <p className="text-gray-400 text-sm">Canary Triggers</p>
           <p className="text-3xl font-bold text-red-500">{canaryTriggers.length}</p>
+        </div>
+        <div className="cyber-card text-center">
+          <p className="text-gray-400 text-sm">Trusted IP Ranges</p>
+          <p className="text-3xl font-bold text-blue-400">{canaryAllowlist.length}</p>
+        </div>
+        <div className="cyber-card text-center">
+          <p className="text-gray-400 text-sm">Challenge Responses</p>
+          <p className="text-3xl font-bold text-pink-400">{challengeResponses.length}</p>
         </div>
       </div>
 
@@ -262,6 +310,61 @@ export default function SecurityControl() {
                 <p className="text-xs text-gray-300">IP: {t.ip} | {t.city}, {t.country}</p>
                 <p className="text-xs text-gray-400">Token: {t.token}</p>
                 <p className="text-xs text-gray-500">{t.triggered_at ? new Date(t.triggered_at).toLocaleString() : "-"}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="cyber-card">
+          <h3 className="text-lg font-semibold mb-3">Canary Trusted IP Allowlist</h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mb-3">
+            <input
+              className="cyber-input md:col-span-2"
+              placeholder="CIDR or IP (e.g. 203.0.113.0/24)"
+              value={newCidr}
+              onChange={(e) => setNewCidr(e.target.value)}
+            />
+            <input
+              className="cyber-input"
+              placeholder="Label"
+              value={newLabel}
+              onChange={(e) => setNewLabel(e.target.value)}
+            />
+          </div>
+          <button className="cyber-btn mb-3" onClick={handleAddAllowlist}>
+            Add Trusted Range
+          </button>
+          <div className="space-y-2 max-h-[260px] overflow-auto pr-1">
+            {canaryAllowlist.length === 0 && <p className="text-sm text-gray-400">No trusted ranges defined.</p>}
+            {canaryAllowlist.map((entry) => (
+              <div key={entry._id} className="border border-white/10 rounded-lg p-3 bg-white/5">
+                <p className="font-semibold text-white">{entry.cidr}</p>
+                <p className="text-xs text-gray-400">{entry.label || "Trusted Source"}</p>
+                <button
+                  className="mt-2 px-3 py-1 rounded bg-red-600 hover:bg-red-700 text-white text-xs"
+                  onClick={() => handleDeleteAllowlist(entry._id)}
+                >
+                  Remove
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="cyber-card">
+          <h3 className="text-lg font-semibold mb-3">Canary Challenge Responses</h3>
+          <div className="space-y-2 max-h-[360px] overflow-auto pr-1">
+            {challengeResponses.length === 0 && <p className="text-sm text-gray-400">No responses captured yet.</p>}
+            {challengeResponses.map((r, idx) => (
+              <div key={`${r.challenge_token}-${idx}`} className="border border-pink-500/30 rounded-lg p-3 bg-pink-900/10">
+                <p className="font-semibold text-pink-300">Challenge: {r.challenge_token}</p>
+                <p className="text-xs text-gray-300">IP: {r.ip}</p>
+                <p className="text-xs text-gray-300">Email: {r.response?.email || "-"}</p>
+                <p className="text-xs text-gray-300">Name: {r.response?.name || "-"}</p>
+                <p className="text-xs text-gray-400">Reason: {r.response?.reason || "-"}</p>
+                <p className="text-xs text-gray-500 mt-1">{r.submitted_at ? new Date(r.submitted_at).toLocaleString() : "-"}</p>
               </div>
             ))}
           </div>

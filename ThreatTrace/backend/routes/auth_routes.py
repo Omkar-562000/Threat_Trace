@@ -2,7 +2,7 @@
 
 from flask import Blueprint, request, jsonify, current_app
 from flask_bcrypt import Bcrypt
-from flask_jwt_extended import create_access_token
+from flask_jwt_extended import create_access_token, verify_jwt_in_request, get_jwt_identity, get_jwt
 from flask_mail import Message
 from datetime import datetime, timedelta
 import uuid
@@ -78,6 +78,16 @@ def register():
             "locked_until": None,
             "last_login_at": None,
             "last_login_ip": None,
+            "profile": {
+                "display_name": name,
+                "phone": "",
+                "organization": "",
+                "job_title": "",
+                "timezone": "",
+                "bio": "",
+                "avatar_url": "",
+                "updated_at": datetime.utcnow(),
+            },
         })
 
         return jsonify({"status": "success", "message": "Account created successfully"}), 201
@@ -215,7 +225,16 @@ def login():
                 "id": str(user["_id"]),
                 "name": user["name"],
                 "email": user["email"],
-                "role": user.get("role", "personal")
+                "role": user.get("role", "personal"),
+                "profile": {
+                    "display_name": user.get("profile", {}).get("display_name", user.get("name", "")),
+                    "phone": user.get("profile", {}).get("phone", ""),
+                    "organization": user.get("profile", {}).get("organization", ""),
+                    "job_title": user.get("profile", {}).get("job_title", ""),
+                    "timezone": user.get("profile", {}).get("timezone", ""),
+                    "bio": user.get("profile", {}).get("bio", ""),
+                    "avatar_url": user.get("profile", {}).get("avatar_url", ""),
+                },
             }
         }), 200
 
@@ -223,6 +242,128 @@ def login():
     except Exception as e:
         print("❌ LOGIN ERROR:", e)
         return jsonify({"status": "error", "message": "Login failed"}), 500
+
+
+# ------------------------------------------------------------
+# PROFILE (GET/UPDATE)
+# ------------------------------------------------------------
+@auth_bp.route("/profile", methods=["GET"])
+def get_profile():
+    try:
+        verify_jwt_in_request()
+        identity = get_jwt_identity()
+
+        db = current_app.config["DB"]
+        users = db["users"]
+        try:
+            from bson import ObjectId
+            user = users.find_one({"_id": ObjectId(str(identity))})
+        except Exception:
+            user = users.find_one({"_id": str(identity)})
+
+        if not user:
+            return jsonify({"status": "error", "message": "User not found"}), 404
+
+        return jsonify(
+            {
+                "status": "success",
+                "profile": {
+                    "id": str(user["_id"]),
+                    "name": user.get("name", ""),
+                    "email": user.get("email", ""),
+                    "role": user.get("role", "personal"),
+                    "display_name": user.get("profile", {}).get("display_name", user.get("name", "")),
+                    "phone": user.get("profile", {}).get("phone", ""),
+                    "organization": user.get("profile", {}).get("organization", ""),
+                    "job_title": user.get("profile", {}).get("job_title", ""),
+                    "timezone": user.get("profile", {}).get("timezone", ""),
+                    "bio": user.get("profile", {}).get("bio", ""),
+                    "avatar_url": user.get("profile", {}).get("avatar_url", ""),
+                    "last_login_at": user.get("last_login_at").isoformat() + "Z" if isinstance(user.get("last_login_at"), datetime) else user.get("last_login_at"),
+                    "last_login_ip": user.get("last_login_ip"),
+                },
+            }
+        ), 200
+    except Exception as e:
+        print("❌ GET PROFILE ERROR:", e)
+        return jsonify({"status": "error", "message": "Failed to fetch profile"}), 500
+
+
+@auth_bp.route("/profile", methods=["PUT"])
+def update_profile():
+    try:
+        verify_jwt_in_request()
+        identity = get_jwt_identity()
+        claims = get_jwt() or {}
+
+        data = request.get_json(silent=True) or {}
+        name = (data.get("name") or "").strip()
+        avatar_url = (data.get("avatar_url") or "").strip()
+        if avatar_url.startswith("data:image/") and len(avatar_url) > 1_000_000:
+            return jsonify({"status": "error", "message": "Avatar image is too large"}), 400
+        profile_fields = {
+            "display_name": (data.get("display_name") or "").strip(),
+            "phone": (data.get("phone") or "").strip(),
+            "organization": (data.get("organization") or "").strip(),
+            "job_title": (data.get("job_title") or "").strip(),
+            "timezone": (data.get("timezone") or "").strip(),
+            "bio": (data.get("bio") or "").strip(),
+            "avatar_url": avatar_url,
+            "updated_at": datetime.utcnow(),
+        }
+
+        db = current_app.config["DB"]
+        users = db["users"]
+        try:
+            from bson import ObjectId
+            q = {"_id": ObjectId(str(identity))}
+        except Exception:
+            q = {"_id": str(identity)}
+
+        update_doc = {"$set": {"profile": profile_fields}}
+        if name:
+            update_doc["$set"]["name"] = name
+
+        result = users.update_one(q, update_doc)
+        if result.matched_count == 0:
+            return jsonify({"status": "error", "message": "User not found"}), 404
+
+        user = users.find_one(q)
+        log_security_event(
+            action="update_profile",
+            status="success",
+            severity="info",
+            details={"fields_updated": [k for k, v in profile_fields.items() if k != "updated_at" and v != ""]},
+            target="users",
+            user_id=str(identity),
+            role=claims.get("role"),
+            source="auth_api",
+        )
+
+        return jsonify(
+            {
+                "status": "success",
+                "message": "Profile updated",
+                "profile": {
+                    "id": str(user["_id"]),
+                    "name": user.get("name", ""),
+                    "email": user.get("email", ""),
+                    "role": user.get("role", "personal"),
+                    "display_name": user.get("profile", {}).get("display_name", user.get("name", "")),
+                    "phone": user.get("profile", {}).get("phone", ""),
+                    "organization": user.get("profile", {}).get("organization", ""),
+                    "job_title": user.get("profile", {}).get("job_title", ""),
+                    "timezone": user.get("profile", {}).get("timezone", ""),
+                    "bio": user.get("profile", {}).get("bio", ""),
+                    "avatar_url": user.get("profile", {}).get("avatar_url", ""),
+                    "last_login_at": user.get("last_login_at").isoformat() + "Z" if isinstance(user.get("last_login_at"), datetime) else user.get("last_login_at"),
+                    "last_login_ip": user.get("last_login_ip"),
+                },
+            }
+        ), 200
+    except Exception as e:
+        print("❌ UPDATE PROFILE ERROR:", e)
+        return jsonify({"status": "error", "message": "Failed to update profile"}), 500
 
 
 # ------------------------------------------------------------

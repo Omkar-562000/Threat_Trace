@@ -105,7 +105,14 @@ def block_abusive_ips():
     path = request.path or ""
     if not path.startswith("/api/"):
         return None
-    if path.startswith("/api/auth/login") or path.startswith("/api/auth/register") or path.startswith("/api/auth/forgot-password") or path.startswith("/api/auth/reset-password"):
+    if (
+        path.startswith("/api/auth/login")
+        or path.startswith("/api/auth/register")
+        or path.startswith("/api/auth/forgot-password")
+        or path.startswith("/api/auth/reset-password")
+        or path.startswith("/api/canary/trap/")
+        or path.startswith("/api/canary/challenge/")
+    ):
         return None
 
     try:
