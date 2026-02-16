@@ -119,7 +119,6 @@ export default function DashboardLayout({ children }) {
         >
           <TopNavbar
             onMobileMenuClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            mobileMenuOpen={mobileMenuOpen}
           />
         </header>
 
@@ -127,7 +126,9 @@ export default function DashboardLayout({ children }) {
            PAGE CONTENT
         --------------------------------------------------------- */}
         <main className="pt-20 px-3 sm:px-4 md:px-6 pb-6 overflow-auto flex-1">
-          {children}
+          <div className="w-full max-w-[1600px] mx-auto">
+            {children}
+          </div>
         </main>
 
         {/* ---------------------------------------------------------
