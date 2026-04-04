@@ -6,6 +6,7 @@ Flask-Mail
 Flask-Bcrypt
 APScheduler
 eventlet
+gunicorn
 pymongo
 python-dotenv
 pandas
