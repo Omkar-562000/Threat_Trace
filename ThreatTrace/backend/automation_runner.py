@@ -124,16 +124,21 @@ def main():
     print("="*70 + "\n")
     
     # Keep main thread alive
+    reported_stopped = set()
     try:
         while True:
             # Check if threads are still alive
             alive = [t for t in threads if t.is_alive()]
             
             if len(alive) < len(threads):
-                print("\n⚠️  Some threads have stopped!")
-                for t in threads:
-                    if not t.is_alive():
-                        print(f"   - {t.name} is not running")
+                newly_stopped = [t.name for t in threads if not t.is_alive() and t.name not in reported_stopped]
+                if newly_stopped:
+                    print("\nWARNING: Some threads have stopped!")
+                    for name in newly_stopped:
+                        print(f"   - {name} is not running")
+                        reported_stopped.add(name)
+            else:
+                reported_stopped.clear()
             
             time.sleep(10)
             

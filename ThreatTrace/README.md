@@ -190,6 +190,7 @@ Windows events / local files / watched directories
 - suspicious extension checks
 - entropy-based detection logic
 - stored scan logs and live ransomware alerts
+- deployment-safe automation ingestion for local endpoint scan metadata
 
 ### File integrity audit
 
@@ -285,6 +286,7 @@ For a fast local run, start with backend, then frontend, then optional automatio
 - Node.js + npm
 - MongoDB local instance or MongoDB Atlas
 - Windows if you want to run Windows Event Log automation
+- `pywin32` for Windows Event Log automation on Windows hosts
 
 ### 2. Backend setup
 
@@ -358,6 +360,19 @@ To register critical files for integrity monitoring:
 python auto_file_registration.py
 ```
 
+If your backend is deployed, point local automation at the hosted API before starting it:
+
+```powershell
+$env:BACKEND_API_URL="https://your-backend-app.onrender.com"
+python automation_runner.py
+```
+
+For a permanent Windows user-level setting:
+
+```powershell
+setx BACKEND_API_URL "https://your-backend-app.onrender.com"
+```
+
 ## Typical Run Order
 
 1. Start MongoDB or confirm Atlas connectivity
@@ -373,7 +388,16 @@ Anyone cloning the project should only need to change environment values, not so
 - `backend/.env`: set `MONGO_URI`, `SECRET_KEY`, `JWT_SECRET_KEY`, `FRONTEND_URL`, `CORS_ALLOWED_ORIGINS`, and optionally mail settings.
 - `frontend/.env`: set `VITE_API_BASE` to the backend URL they will use.
 - `BACKEND_API_URL`: set this only if they want automation scripts to post to a non-local backend.
+- `MAIL_USERNAME` and `MAIL_PASSWORD`: set these if forgot-password and alert emails should work in deployment.
 - Windows-specific automation paths in `backend/automation_config.py`: adjust watched directories or monitored files if their machine layout is different.
+
+## Deployment Notes
+
+- Deploy the Flask backend separately from local automation agents.
+- Windows automation scripts run on the user's machine and should post to the deployed backend through `BACKEND_API_URL`.
+- The hosted backend cannot open local Windows file paths such as `C:\Users\...`; automation now sends precomputed ransomware scan metadata instead.
+- Windows Event Log collection requires `pywin32` on the local Windows machine.
+- Forgot-password email delivery requires valid `MAIL_USERNAME` and `MAIL_PASSWORD` values in the deployed backend environment.
 
 ## At a Glance
 

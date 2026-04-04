@@ -220,30 +220,32 @@ def scan_directory(directory: str) -> list:
 # ============================================================
 
 def send_scan_result(result: dict):
-    """Send scan result to backend API"""
+    """Send scan result metadata to backend API."""
     try:
-        # Only send suspicious files to avoid DB bloat
-        if not result.get("suspicious"):
-            return
-        
         url = f"{BACKEND_API_URL}/api/ransomware/scan"
-        
+
         payload = {
-            "file_path": result["path"]
+            "file_path": result["path"],
+            "filename": Path(result["path"]).name,
+            "entropy": result.get("entropy", 0.0),
+            "suspicious": bool(result.get("suspicious")),
+            "reason": result.get("reason", []),
+            "scanned_at": result.get("scanned_at"),
+            "source": "automation_scanner",
         }
-        
+
         response = requests.post(url, json=payload, timeout=10)
-        
+
         if response.status_code in [200, 201]:
-            if AUTOMATION_DEBUG:
-                print(f"  ✅ Sent alert for: {Path(result['path']).name}")
+            if AUTOMATION_DEBUG and result.get("suspicious"):
+                print(f"  OK Sent alert for: {Path(result['path']).name}")
         else:
-            print(f"  ⚠ Backend returned {response.status_code}: {response.text}")
-            
+            print(f"  WARNING Backend returned {response.status_code}: {response.text}")
+
     except requests.exceptions.ConnectionError:
-        print(f"  ❌ Cannot connect to backend at {BACKEND_API_URL}")
+        print(f"  ERROR Cannot connect to backend at {BACKEND_API_URL}")
     except Exception as e:
-        print(f"  ❌ Error sending result: {e}")
+        print(f"  ERROR sending result: {e}")
 
 
 # ============================================================
@@ -291,16 +293,15 @@ def run_scanner():
                 results = scan_directory(directory)
                 all_results.extend(results)
             
-            # Send suspicious files to backend
+            # Send scan metadata to backend
             suspicious_count = sum(1 for r in all_results if r.get("suspicious"))
             
             if suspicious_count > 0:
-                print(f"\n🚨 Found {suspicious_count} SUSPICIOUS files!")
-                
-                for result in all_results:
-                    if result.get("suspicious"):
-                        send_scan_result(result)
-            
+                print(f"\nALERT Found {suspicious_count} SUSPICIOUS files!")
+
+            for result in all_results:
+                send_scan_result(result)
+
             # Broadcast stats update via WebSocket
             try:
                 stats_payload = {

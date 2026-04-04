@@ -14,3 +14,4 @@ scikit-learn
 requests
 reportlab
 bcrypt
+pywin32; platform_system == "Windows"

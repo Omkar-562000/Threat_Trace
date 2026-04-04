@@ -20,16 +20,14 @@ MAX_FILE_SIZE_MB = 50
 MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
 
 
-# ---------------------------------------------------------
-# ENTROPY CALCULATION (Shannon)
-# ---------------------------------------------------------
 def calculate_entropy(data: bytes) -> float:
     if not data:
         return 0.0
-    # count occurrences
+
     freq = [0] * 256
     for b in data:
         freq[b] += 1
+
     entropy = 0.0
     length = len(data)
     for count in freq:
@@ -40,11 +38,8 @@ def calculate_entropy(data: bytes) -> float:
     return entropy
 
 
-# ---------------------------------------------------------
-# SUSPICIOUS FILE ANALYZER
-# ---------------------------------------------------------
 def analyze_file_for_ransomware(file_path: str) -> dict:
-    SUSPICIOUS_EXTENSIONS = {".lock", ".enc", ".crypt", ".ransom", ".encrypted"}
+    suspicious_extensions = {".lock", ".enc", ".crypt", ".ransom", ".encrypted"}
 
     result = {
         "path": file_path,
@@ -59,12 +54,11 @@ def analyze_file_for_ransomware(file_path: str) -> dict:
         return result
 
     ext = p.suffix.lower()
-    if ext in SUSPICIOUS_EXTENSIONS:
+    if ext in suspicious_extensions:
         result["suspicious"] = True
         result["reason"].append(f"Suspicious extension: {ext}")
 
     try:
-        # read a sample window for entropy (first 64KB gives a good estimate)
         with p.open("rb") as fh:
             sample = fh.read(64 * 1024)
             entropy = calculate_entropy(sample)
@@ -78,15 +72,69 @@ def analyze_file_for_ransomware(file_path: str) -> dict:
     return result
 
 
-# ---------------------------------------------------------
-# 1) PATH-BASED SCAN
-# POST JSON: { "file_path": "/abs/path/to/file" }
-# ---------------------------------------------------------
+def normalize_scan_payload(payload: dict) -> dict:
+    path_value = (payload.get("path") or payload.get("file_path") or "").strip()
+    filename = payload.get("filename") or (Path(path_value).name if path_value else "unknown")
+
+    reason = payload.get("reason") or []
+    if isinstance(reason, str):
+        reason = [reason]
+
+    scan_time = payload.get("scan_time") or payload.get("scanned_at") or datetime.utcnow()
+    if isinstance(scan_time, str):
+        try:
+            scan_time = datetime.fromisoformat(scan_time.replace("Z", "+00:00")).replace(tzinfo=None)
+        except ValueError:
+            scan_time = datetime.utcnow()
+
+    return {
+        "path": path_value,
+        "file_path": path_value,
+        "filename": filename,
+        "entropy": float(payload.get("entropy", 0.0) or 0.0),
+        "suspicious": bool(payload.get("suspicious")),
+        "reason": reason,
+        "scan_time": scan_time,
+        "source": payload.get("source", "api"),
+    }
+
+
+def persist_scan_result(result: dict) -> None:
+    db = current_app.config["DB"]
+    db["ransomware_logs"].insert_one(dict(result))
+    db["ransomware_scans"].insert_one(dict(result))
+
+
 @ransomware_bp.route("/scan", methods=["POST"])
 def scan_file_path():
     try:
         data = request.get_json(force=True, silent=True) or {}
         file_path = data.get("file_path") or data.get("path")
+
+        # Hosted backend mode: local automation sends scan metadata so the cloud
+        # backend does not need access to the user's filesystem.
+        if data.get("suspicious") is not None and ("entropy" in data or "reason" in data):
+            result = normalize_scan_payload({**data, "source": data.get("source", "automation")})
+
+            try:
+                persist_scan_result(result)
+            except Exception as e:
+                print("WARNING: Failed to store ransomware scan metadata:", e)
+
+            if result["suspicious"]:
+                try:
+                    send_alert(
+                        title="Ransomware Alert",
+                        message=f"Suspicious file detected on endpoint: {result['file_path']}",
+                        severity="critical",
+                        source="ransomware",
+                    )
+                except Exception as e:
+                    print("WARNING: send_alert failed:", e)
+
+            response_result = dict(result)
+            response_result["scan_time"] = result["scan_time"].isoformat() + "Z"
+            return jsonify({"status": "success", "result": response_result, "ingested": True}), 200
 
         if not file_path:
             return jsonify({"status": "error", "message": "file_path required"}), 400
@@ -96,21 +144,15 @@ def scan_file_path():
             return jsonify({"status": "error", "message": "File not found"}), 404
 
         result = analyze_file_for_ransomware(str(p))
+        stored_result = normalize_scan_payload(
+            {**result, "scan_time": datetime.utcnow(), "source": "backend_path_scan"}
+        )
 
-        # Save to DB (best-effort)
         try:
-            db = current_app.config["DB"]
-            db["ransomware_logs"].insert_one({
-                "path": result["path"],
-                "entropy": result["entropy"],
-                "suspicious": result["suspicious"],
-                "reason": result["reason"],
-                "scan_time": datetime.utcnow(),
-            })
+            persist_scan_result(stored_result)
         except Exception as e:
-            print("⚠ Failed to store ransomware log:", e)
+            print("WARNING: Failed to store ransomware log:", e)
 
-        # Real-time alert if suspicious
         if result["suspicious"]:
             try:
                 send_alert(
@@ -120,7 +162,7 @@ def scan_file_path():
                     source="ransomware",
                 )
             except Exception as e:
-                print("⚠ send_alert failed:", e)
+                print("WARNING: send_alert failed:", e)
 
         return jsonify({"status": "success", "result": result}), 200
 
@@ -129,10 +171,6 @@ def scan_file_path():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 
-# ---------------------------------------------------------
-# 2) UPLOAD + SCAN (Dashboard Upload)
-# Multipart form: file -> file
-# ---------------------------------------------------------
 @ransomware_bp.route("/upload", methods=["POST"])
 def upload_and_scan():
     saved_path = None
@@ -148,41 +186,26 @@ def upload_and_scan():
 
         _, ext = os.path.splitext(filename)
         if ext.lower() not in ALLOWED_EXTENSIONS:
-            return jsonify({
-                "status": "error",
-                "message": f"File type not allowed: {ext}"
-            }), 400
+            return jsonify({"status": "error", "message": f"File type not allowed: {ext}"}), 400
 
-        # Size check — content_length may be None for some clients
         content_length = request.content_length or file.content_length or None
         if content_length and content_length > MAX_FILE_SIZE_BYTES:
-            return jsonify({
-                "status": "error",
-                "message": f"File exceeds {MAX_FILE_SIZE_MB}MB"
-            }), 400
+            return jsonify({"status": "error", "message": f"File exceeds {MAX_FILE_SIZE_MB}MB"}), 400
 
-        # Save uploaded file to uploads dir
         unique_name = f"{uuid.uuid4().hex}_{filename}"
         saved_path = UPLOAD_DIR / unique_name
         file.save(saved_path)
 
-        # Analyze file
         result = analyze_file_for_ransomware(str(saved_path))
+        stored_result = normalize_scan_payload(
+            {**result, "filename": filename, "scan_time": datetime.utcnow(), "source": "uploaded_file"}
+        )
 
-        # Save to DB
         try:
-            db = current_app.config["DB"]
-            db["ransomware_logs"].insert_one({
-                "path": result["path"],
-                "entropy": result["entropy"],
-                "suspicious": result["suspicious"],
-                "reason": result["reason"],
-                "scan_time": datetime.utcnow(),
-            })
+            persist_scan_result(stored_result)
         except Exception as e:
-            print("⚠ Failed to store ransomware log:", e)
+            print("WARNING: Failed to store ransomware log:", e)
 
-        # Real-time alert
         if result["suspicious"]:
             try:
                 send_alert(
@@ -192,9 +215,8 @@ def upload_and_scan():
                     source="ransomware",
                 )
             except Exception as e:
-                print("⚠ send_alert failed:", e)
+                print("WARNING: send_alert failed:", e)
 
-        # Return result
         return jsonify({"status": "success", "result": result}), 200
 
     except Exception as e:
@@ -202,7 +224,6 @@ def upload_and_scan():
         return jsonify({"status": "error", "message": "Upload scan failed"}), 500
 
     finally:
-        # Always attempt to cleanup saved file (best-effort)
         if saved_path and saved_path.exists():
             try:
                 saved_path.unlink()
@@ -210,36 +231,15 @@ def upload_and_scan():
                 pass
 
 
-# ---------------------------------------------------------
-# 3) GET ALL RANSOMWARE LOGS
-# ---------------------------------------------------------
 @ransomware_bp.route("/logs", methods=["GET"])
 def get_ransomware_logs():
     try:
         db = current_app.config["DB"]
         logs = list(db["ransomware_logs"].find({}, {"_id": 0}).sort("scan_time", -1))
-        # Convert any datetime to isoformat for frontend safety
-        for l in logs:
-            if isinstance(l.get("scan_time"), datetime):
-                l["scan_time"] = l["scan_time"].isoformat() + "Z"
+        for log in logs:
+            if isinstance(log.get("scan_time"), datetime):
+                log["scan_time"] = log["scan_time"].isoformat() + "Z"
         return jsonify({"status": "success", "logs": logs}), 200
     except Exception as e:
         print("get_ransomware_logs error:", e)
         return jsonify({"status": "error", "message": str(e)}), 500
-
-
-# ---------------------------------------------------------
-# NOTE on compatibility:
-#
-# If your frontend still calls POST /api/scan (root), you'll get 404.
-# Recommended fixes:
-#  - Update frontend to call POST /api/ransomware/scan
-#  OR
-#  - In app.py, also register this blueprint at url_prefix="/api" in addition
-#    to "/api/ransomware" (so both /api/scan and /api/ransomware/scan work).
-# Example:
-#    app.register_blueprint(ransomware_bp, url_prefix="/api/ransomware")
-#    app.register_blueprint(ransomware_bp, url_prefix="/api")   # compatibility
-#
-# The latter registers same routes twice — that is acceptable for dev/testing compatibility.
-# ---------------------------------------------------------
