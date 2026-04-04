@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import CyberpunkBackground from "../components/ui/CyberpunkBackground";
 import Logo from "../components/ui/Logo";
+import { apiUrl } from "../utils/api";
 
 export default function ForgotPassword() {
     const navigate = useNavigate();
@@ -20,7 +21,7 @@ export default function ForgotPassword() {
 
         try {
             const res = await axios.post(
-                "http://127.0.0.1:5000/api/auth/forgot-password",
+                apiUrl("/api/auth/forgot-password"),
                 { email }
             );
 
@@ -103,3 +104,6 @@ export default function ForgotPassword() {
         </div>
     );
 }
+
+
+

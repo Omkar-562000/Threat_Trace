@@ -1,7 +1,7 @@
 import axiosInstance from "../utils/axiosConfig";
+import { apiUrl } from "../utils/api";
 
-const API_ROOT = import.meta.env.VITE_API_BASE || "http://127.0.0.1:5000";
-const CANARY_API = `${API_ROOT}/api/canary`;
+const CANARY_API = apiUrl("/api/canary");
 
 export async function createCanaryAsset({ name, asset_type = "link", metadata = {} } = {}) {
   const res = await axiosInstance.post(`${CANARY_API}/assets`, {
@@ -57,3 +57,5 @@ export default {
   getCanaryChallengeResponses,
   buildCanaryTrapUrl,
 };
+
+

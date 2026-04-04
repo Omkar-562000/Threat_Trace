@@ -1,17 +1,13 @@
-// src/App.jsx
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 
-// Auth Pages
 import ForgotPassword from "./pages/ForgotPassword";
 import Login from "./pages/Login";
 import ResetPassword from "./pages/ResetPassword";
 import Signup from "./pages/Signup";
 
-// Dashboard Layout + Protection
 import DashboardLayout from "./layouts/DashboardLayout";
 import ProtectedRoute from "./utils/ProtectedRoute";
 
-// Dashboard Feature Pages
 import Alerts from "./pages/Alerts";
 import Audit from "./pages/Audit";
 import EnhancedDashboard from "./pages/EnhancedDashboard";
@@ -24,15 +20,18 @@ import SecurityControl from "./pages/SecurityControl";
 
 export default function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter
+      future={{
+        v7_startTransition: true,
+        v7_relativeSplatPath: true,
+      }}
+    >
       <Routes>
-        {/* ===== AUTH ROUTES ===== */}
         <Route path="/" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
-        <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/reset-password/:token" element={<ResetPassword />} />
 
-        {/* ===== PROTECTED DASHBOARD AREA ===== */}
         <Route
           path="/dashboard"
           element={
@@ -132,14 +131,9 @@ export default function App() {
           }
         />
 
-        {/* ===== FALLBACK ===== */}
         <Route
           path="*"
-          element={
-            <div className="p-6 text-white text-center text-xl">
-              ❌ Page Not Found
-            </div>
-          }
+          element={<div className="p-6 text-white text-center text-xl">Page Not Found</div>}
         />
       </Routes>
     </BrowserRouter>

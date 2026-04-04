@@ -3,12 +3,12 @@
 
 import axios from "axios";
 import axiosInstance from "../utils/axiosConfig";
+import { apiUrl } from "../utils/api";
 
 // ----------------------------------------------------------
 // Base URL
 // ----------------------------------------------------------
-const API_ROOT = import.meta.env.VITE_API_BASE || "http://127.0.0.1:5000";
-const LOGS_API = `${API_ROOT}/api/logs`;
+const LOGS_API = apiUrl("/api/logs");
 
 // ----------------------------------------------------------
 // Helper: safe JSON parser fallback
@@ -124,3 +124,5 @@ export default {
   exportLogs,
   downloadExport,
 };
+
+

@@ -1,8 +1,8 @@
 // frontend/src/services/reportsService.js
 import axiosInstance from "../utils/axiosConfig";
+import { apiUrl } from "../utils/api";
 
-const API_ROOT = import.meta.env.VITE_API_BASE || "http://127.0.0.1:5000";
-const REPORTS_API = `${API_ROOT}/api/reports`;
+const REPORTS_API = apiUrl("/api/reports");
 
 /**
  * Generate summary report
@@ -88,3 +88,5 @@ export default {
   exportAlertsCSV,
   exportSummaryPDF,
 };
+
+

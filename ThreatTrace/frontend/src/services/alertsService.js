@@ -1,8 +1,8 @@
 // frontend/src/services/alertsService.js
 import axiosInstance from "../utils/axiosConfig";
+import { apiUrl } from "../utils/api";
 
-const API_ROOT = import.meta.env.VITE_API_BASE || "http://127.0.0.1:5000";
-const ALERTS_API = `${API_ROOT}/api/alerts`;
+const ALERTS_API = apiUrl("/api/alerts");
 
 /**
  * Get alerts with filters
@@ -137,3 +137,5 @@ export default {
   bulkAcknowledgeAlerts,
   bulkResolveAlerts,
 };
+
+

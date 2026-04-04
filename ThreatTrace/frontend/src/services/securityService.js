@@ -1,7 +1,7 @@
 import axiosInstance from "../utils/axiosConfig";
+import { apiUrl } from "../utils/api";
 
-const API_ROOT = import.meta.env.VITE_API_BASE || "http://127.0.0.1:5000";
-const SECURITY_API = `${API_ROOT}/api/security`;
+const SECURITY_API = apiUrl("/api/security");
 
 export async function getBlockedIps(active = true) {
   const res = await axiosInstance.get(`${SECURITY_API}/blocked-ips`, {
@@ -45,3 +45,5 @@ export default {
   releaseQuarantinedUser,
   getSecurityAuditTrail,
 };
+
+

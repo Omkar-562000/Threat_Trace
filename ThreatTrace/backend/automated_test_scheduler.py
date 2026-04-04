@@ -31,7 +31,7 @@ from test_data_generator import (
     ingest_logs_to_system
 )
 
-API_BASE = "http://127.0.0.1:5000"
+API_BASE = os.getenv("BACKEND_API_URL", "http://127.0.0.1:5000").rstrip("/")
 
 class AutomatedTestScheduler:
     def __init__(self):
@@ -225,3 +225,4 @@ class AutomatedTestScheduler:
 if __name__ == "__main__":
     scheduler = AutomatedTestScheduler()
     scheduler.start()
+

@@ -24,3 +24,4 @@ export function GlassCardHeader({ children }) {
 export function GlassCardContent({ children }) {
     return <div className="text-gray-200">{children}</div>;
 }
+

@@ -4,13 +4,13 @@ import axios from "axios";
 import { useEffect, useState } from "react";
 import Toast from "../components/ui/Toast";
 import socket from "../utils/socket";
+import { apiUrl } from "../utils/api";
 
 export default function Dashboard() {
   /* -------------------------------------------------------
      API ROOT
   ------------------------------------------------------- */
-  const API_ROOT = import.meta.env.VITE_API_BASE || "http://127.0.0.1:5000";
-  const API = `${API_ROOT}/api`;
+    const API = apiUrl("/api");
 
   /* -------------------------------------------------------
      STATES
@@ -277,3 +277,5 @@ export default function Dashboard() {
     </div>
   );
 }
+
+

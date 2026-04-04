@@ -19,6 +19,9 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+API_BASE = os.getenv("BACKEND_API_URL", "http://127.0.0.1:5000").rstrip("/")
+LOG_INGEST_URL = f"{API_BASE}/api/logs/ingest"
+
 # Sample log templates
 LOG_TEMPLATES = {
     "clean": [
@@ -153,7 +156,7 @@ def tamper_log_file(original_file, tampered_file):
     print(f"⚠️  Created tampered log file: {tampered_file}")
     return tampered_file
 
-def ingest_logs_to_system(log_file, api_url="http://127.0.0.1:5000/api/logs/ingest"):
+def ingest_logs_to_system(log_file, api_url=LOG_INGEST_URL):
     """Send logs to the system via API"""
     try:
         with open(log_file, "r") as f:
@@ -188,7 +191,7 @@ def generate_continuous_logs(duration_minutes=10, interval_seconds=5):
     print(f"🔄 Generating logs for {duration_minutes} minutes (every {interval_seconds}s)...")
     
     end_time = datetime.now() + timedelta(minutes=duration_minutes)
-    api_url = "http://127.0.0.1:5000/api/logs/ingest"
+    api_url = LOG_INGEST_URL
     
     while datetime.now() < end_time:
         # Generate random log
@@ -292,3 +295,5 @@ if __name__ == "__main__":
             print("❌ Please specify --file for ingest mode")
     elif args.mode == "continuous":
         generate_continuous_logs(args.duration, args.interval)
+
+

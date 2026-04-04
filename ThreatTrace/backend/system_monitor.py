@@ -1,7 +1,7 @@
 # backend/system_monitor.py
 """
 Standalone monitor: tails a file and POSTs new lines to the backend /api/logs/ingest.
-Usage: python system_monitor.py --file "C:/path/to/system.log" --url "http://127.0.0.1:5000/api/logs/ingest"
+Usage: python system_monitor.py --file "C:/path/to/system.log" --url "$env:BACKEND_API_URL/api/logs/ingest"
 """
 import time
 import requests
@@ -9,8 +9,8 @@ import argparse
 import os
 import json
 
+
 def tail_and_post(file_path, ingest_url, source="system_monitor", level="INFO", sleep=1.0):
-    # start at end of file
     with open(file_path, "rb") as f:
         f.seek(0, os.SEEK_END)
         while True:
@@ -20,7 +20,7 @@ def tail_and_post(file_path, ingest_url, source="system_monitor", level="INFO", 
                 continue
             try:
                 text = line.decode("utf-8", errors="replace").strip()
-            except:
+            except Exception:
                 text = str(line)
             payload = {
                 "message": text,
@@ -34,10 +34,12 @@ def tail_and_post(file_path, ingest_url, source="system_monitor", level="INFO", 
             except Exception as e:
                 print("POST error:", e)
 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--file", required=True, help="Path to log file to tail")
-    parser.add_argument("--url", default="http://127.0.0.1:5000/api/logs/ingest", help="Ingest URL")
+    default_url = os.getenv("SYSTEM_MONITOR_URL") or f"{os.getenv('BACKEND_API_URL', 'http://127.0.0.1:5000').rstrip('/')}/api/logs/ingest"
+    parser.add_argument("--url", default=default_url, help="Ingest URL")
     parser.add_argument("--source", default="system_monitor")
     args = parser.parse_args()
 

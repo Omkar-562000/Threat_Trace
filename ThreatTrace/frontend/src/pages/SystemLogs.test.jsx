@@ -143,3 +143,4 @@ describe('SystemLogs', () => {
     expect(screen.queryByText('Log message 0')).not.toBeInTheDocument();
   });
 });
+

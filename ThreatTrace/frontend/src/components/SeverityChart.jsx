@@ -107,3 +107,4 @@ export default function SeverityChart({ data = {} }) {
     </div>
   );
 }
+

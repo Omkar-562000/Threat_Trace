@@ -6,6 +6,7 @@ import { useNavigate } from "react-router-dom";
 
 import CyberpunkBackground from "../components/ui/CyberpunkBackground";
 import Logo from "../components/ui/Logo";
+import { apiUrl } from "../utils/api";
 
 export default function Login() {
 
@@ -36,7 +37,7 @@ export default function Login() {
     try {
 
       const res = await axios.post(
-        "http://127.0.0.1:5000/api/auth/login",
+        apiUrl("/api/auth/login"),
         formData
       );
 
@@ -236,3 +237,6 @@ export default function Login() {
   );
 
 }
+
+
+

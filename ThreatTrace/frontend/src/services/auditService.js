@@ -1,9 +1,9 @@
 // frontend/src/services/auditService.js
-const API_ROOT = import.meta.env.VITE_API_BASE || "http://127.0.0.1:5000";
+import { apiUrl } from "../utils/api";
 
 // Audit + Scheduler endpoints
-const AUDIT_API = `${API_ROOT}/api/audit`;
-const SCHED_API = `${API_ROOT}/api/scheduler`;
+const AUDIT_API = apiUrl("/api/audit");
+const SCHED_API = apiUrl("/api/scheduler");
 
 function authHeader() {
   const token = localStorage.getItem("token");
@@ -188,3 +188,5 @@ export default {
   schedulerStop,
   schedulerRunNow,
 };
+
+

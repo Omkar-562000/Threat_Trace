@@ -35,3 +35,4 @@ export default function TimelineChart({ data = [], height = 60 }) {
     </div>
   );
 }
+

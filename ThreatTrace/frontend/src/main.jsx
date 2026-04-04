@@ -7,3 +7,4 @@ import { initTheme } from './utils/theme'
 initTheme()
 
 createRoot(document.getElementById('root')).render(<App />)
+

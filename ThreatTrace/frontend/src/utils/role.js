@@ -178,3 +178,4 @@ export const getRoleBadgeColor = () => {
   const role = getUserRole();
   return ROLE_BADGE_COLORS[role] || "bg-gray-500/20 text-gray-400 border-gray-500";
 };
+

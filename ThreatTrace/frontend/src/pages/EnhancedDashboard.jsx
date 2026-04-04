@@ -20,12 +20,12 @@ import AnimatedStatCard from "../components/AnimatedStatCard";
 import LiveActivityFeed from "../components/LiveActivityFeed";
 import Toast from "../components/ui/Toast";
 import socket from "../utils/socket";
+import { apiUrl } from "../utils/api";
 import axiosInstance from "../utils/axiosConfig";
 
 export default function EnhancedDashboard() {
   const navigate = useNavigate();
-  const API_ROOT = import.meta.env.VITE_API_BASE || "http://127.0.0.1:5000";
-  const API = `${API_ROOT}/api/dashboard`;
+    const API = apiUrl("/api/dashboard");
 
   // States
   const [threatLocations, setThreatLocations] = useState([]);
@@ -55,7 +55,7 @@ export default function EnhancedDashboard() {
 
       let locationsData = [];
       try {
-        const tracked = await axiosInstance.get(`${API_ROOT}/api/locations/recent`, {
+        const tracked = await axiosInstance.get(apiUrl("/api/locations/recent"), {
           params: { hours: 24 },
         });
         locationsData = tracked.data?.points || [];
@@ -425,3 +425,6 @@ export default function EnhancedDashboard() {
     </div>
   );
 }
+
+
+

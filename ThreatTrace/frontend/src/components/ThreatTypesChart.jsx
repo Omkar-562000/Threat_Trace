@@ -85,3 +85,4 @@ export default function ThreatTypesChart({ data = [] }) {
     </div>
   );
 }
+

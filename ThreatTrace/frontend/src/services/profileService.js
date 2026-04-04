@@ -1,7 +1,7 @@
 import axiosInstance from "../utils/axiosConfig";
+import { apiUrl } from "../utils/api";
 
-const API_ROOT = import.meta.env.VITE_API_BASE || "http://127.0.0.1:5000";
-const AUTH_API = `${API_ROOT}/api/auth`;
+const AUTH_API = apiUrl("/api/auth");
 
 export async function getMyProfile() {
   const res = await axiosInstance.get(`${AUTH_API}/profile`);
@@ -31,3 +31,5 @@ export default {
   cacheProfile,
   readCachedProfile,
 };
+
+

@@ -1,19 +1,19 @@
 """
 ====================================================================
-                ThreatTrace — Backend Application
+                ThreatTrace Backend Application
 ====================================================================
 
 This file bootstraps the entire backend:
 
-✓ Flask App Initialization
-✓ CORS, JWT, Mail, Bcrypt
-✓ MongoDB (via init_db)
-✓ Socket.IO (real-time alerts + logs)
-✓ APScheduler (background integrity scans)
-✓ Alert System Initialization (WebSocket + Email + DB)
-✓ Blueprint Registration (Auth, Audit, Ransomware, Logs, Alerts, Reports)
-✓ Legacy Compatibility Routes (important)
-✓ Graceful Shutdown
+- Flask App Initialization
+- CORS, JWT, Mail, Bcrypt
+- MongoDB (via init_db)
+- Socket.IO (real-time alerts + logs)
+- APScheduler (background integrity scans)
+- Alert System Initialization (WebSocket + Email + DB)
+- Blueprint Registration (Auth, Audit, Ransomware, Logs, Alerts, Reports)
+- Legacy Compatibility Routes (important)
+- Graceful Shutdown
 """
 
 import atexit
@@ -34,24 +34,14 @@ from utils.security_audit import ensure_security_audit_indexes
 from utils.canary_trap import ensure_canary_indexes
 
 
-# ============================================================
-# 1️⃣ FLASK APP INITIALIZATION
-# ============================================================
 app = Flask(__name__)
 app.config.from_object(Config)
 
 
-# ============================================================
-# 2️⃣ CORE EXTENSIONS (CORS + MAIL + JWT + BCRYPT + SOCKET.IO)
-# ============================================================
 CORS(
     app,
     resources={r"/api/*": {
-        "origins": [
-            "http://localhost:5173",
-            "http://127.0.0.1:5173",
-            "http://172.20.10.3:5173",   # your LAN/hotspot IP
-        ]
+        "origins": app.config["CORS_ALLOWED_ORIGINS"]
     }},
     supports_credentials=True
 )
@@ -68,21 +58,15 @@ app.config["BCRYPT"] = bcrypt
 socketio = SocketIO(
     app,
     cors_allowed_origins="*",
-    async_mode="eventlet",
+    async_mode=app.config.get("SOCKET_ASYNC_MODE", "eventlet"),
 )
 app.config["SOCKETIO"] = socketio
 
 
-# ============================================================
-# 3️⃣ ALERT SYSTEM INITIALIZATION
-# ============================================================
 from utils.alert_manager import init_alert_system
 init_alert_system(socketio)
 
 
-# ============================================================
-# 4️⃣ DATABASE INITIALIZATION
-# ============================================================
 db = init_db(app)
 app.config["DB"] = db
 ensure_security_audit_indexes(db)
@@ -101,7 +85,6 @@ def _get_client_ip():
 
 @app.before_request
 def block_abusive_ips():
-    # Enforce only for API routes; keep auth login/register/reset accessible.
     path = request.path or ""
     if not path.startswith("/api/"):
         return None
@@ -124,7 +107,6 @@ def block_abusive_ips():
                 "message": "Request blocked by runtime security policy"
             }), 403
     except Exception:
-        # Fail-open for availability if lookup fails.
         return None
     return None
 
@@ -165,11 +147,6 @@ def is_token_revoked(jwt_header, jwt_payload):
     return False
 
 
-# ============================================================
-# 5️⃣ IMPORT & REGISTER ROUTES
-# ============================================================
-
-# Import blueprints
 from routes.auth_routes import auth_bp, init_mail
 from routes.ransomware_routes import ransomware_bp
 from routes.audit_routes import audit_bp
@@ -181,18 +158,13 @@ from routes.locations_routes import locations_bp
 from routes.security_routes import security_bp
 from routes.canary_routes import canary_bp
 
-# Scheduler (optional)
 try:
     from routes.scheduler_routes import scheduler_bp
 except Exception:
     scheduler_bp = None
 
-# Mail setup
 init_mail(app)
 
-# ------------------------------------------------------------
-# MAIN REGISTRATIONS
-# ------------------------------------------------------------
 app.register_blueprint(auth_bp, url_prefix="/api/auth")
 app.register_blueprint(ransomware_bp, url_prefix="/api/ransomware")
 app.register_blueprint(audit_bp, url_prefix="/api/audit")
@@ -207,24 +179,9 @@ app.register_blueprint(canary_bp, url_prefix="/api/canary")
 if scheduler_bp:
     app.register_blueprint(scheduler_bp, url_prefix="/api/scheduler")
 
-# ------------------------------------------------------------
-# 🔥 **LEGACY / COMPATIBILITY ROUTES**
-# Makes older frontend routes work:
-#    POST /api/scan
-#    POST /api/upload
-#    GET  /api/logs
-# ------------------------------------------------------------
-# WARNING:
-# This does NOT override existing paths inside ransomware_bp.
-# It simply adds the same routes under an additional prefix.
+print("All API routes registered successfully.\n")
 
 
-print("✅ All API routes registered successfully!\n")
-
-
-# ============================================================
-# 7️⃣ HEALTH CHECK ENDPOINT
-# ============================================================
 @app.route("/")
 def index():
     return {
@@ -235,18 +192,15 @@ def index():
     }
 
 
-# ============================================================
-# 7️⃣ GRACEFUL SHUTDOWN
-# ============================================================
 def shutdown_handler(signum=None, frame=None):
-    print("\n⚠️ Shutting down ThreatTrace backend...")
+    print("\nShutting down ThreatTrace backend...")
 
     try:
         from scheduler import stop_scheduler
         if stop_scheduler(app):
-            print("🛑 Scheduler stopped.")
-    except:
-        print("⚠ Scheduler not running or already closed.")
+            print("Scheduler stopped.")
+    except Exception:
+        print("Scheduler not running or already closed.")
 
     sys.exit(0)
 
@@ -256,15 +210,16 @@ signal.signal(signal.SIGINT, shutdown_handler)
 signal.signal(signal.SIGTERM, shutdown_handler)
 
 
-# ============================================================
-# 8️⃣ RUN SERVER
-# ============================================================
 if __name__ == "__main__":
-    print("🚀 ThreatTrace backend running at http://127.0.0.1:5000")
+    host = app.config.get("HOST", "0.0.0.0")
+    port = app.config.get("PORT", 5000)
+    print(f"ThreatTrace backend running at http://127.0.0.1:{port}")
 
     socketio.run(
         app,
-        host="0.0.0.0",
-        port=5000,
+        host=host,
+        port=port,
         debug=app.config.get("DEBUG", True)
     )
+
+

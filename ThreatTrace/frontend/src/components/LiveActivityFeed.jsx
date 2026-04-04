@@ -224,3 +224,4 @@ export default function LiveActivityFeed({ activities = [], maxItems = 50 }) {
     </div>
   );
 }
+

@@ -371,7 +371,8 @@ def update_profile():
 # ------------------------------------------------------------
 def send_reset_email(email, reset_token):
     try:
-        reset_link = f"http://localhost:5173/reset-password?token={reset_token}"
+        frontend_url = (current_app.config.get("FRONTEND_URL") or "http://localhost:5173").rstrip("/")
+        reset_link = f"{frontend_url}/reset-password/{reset_token}"
 
         msg = Message(
             subject="ThreatTrace Password Reset",
@@ -477,3 +478,5 @@ def reset_password(token):
     except Exception as e:
         print("❌ RESET PASSWORD ERROR:", e)
         return jsonify({"status": "error", "message": "Password reset failed"}), 500
+
+

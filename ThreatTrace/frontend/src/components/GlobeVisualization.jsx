@@ -149,3 +149,4 @@ export default function GlobeVisualization({ threats = [], onThreatClick = null,
     </div>
   );
 }
+

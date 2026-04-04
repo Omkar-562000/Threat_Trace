@@ -1,7 +1,7 @@
 import axios from "axios";
+import { apiUrl } from "../utils/api";
 
-const API_ROOT = import.meta.env.VITE_API_BASE || "http://127.0.0.1:5000";
-const API = `${API_ROOT}/api/ransomware`;
+const API = apiUrl("/api/ransomware");
 
 export async function uploadForScan(file) {
   const form = new FormData();
@@ -13,3 +13,5 @@ export async function uploadForScan(file) {
 export async function fetchRansomwareLogs() {
   return axios.get(`${API}/logs`);
 }
+
+

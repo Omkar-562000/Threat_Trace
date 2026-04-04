@@ -1,7 +1,7 @@
 import axiosInstance from "../utils/axiosConfig";
+import { apiUrl } from "../utils/api";
 
-const API_ROOT = import.meta.env.VITE_API_BASE || "http://127.0.0.1:5000";
-const LOCATIONS_API = `${API_ROOT}/api/locations`;
+const LOCATIONS_API = apiUrl("/api/locations");
 
 export async function getLocationEvents({
   severity = "",
@@ -45,3 +45,5 @@ export default {
   getLocationEventById,
   ingestLocationEvent,
 };
+
+

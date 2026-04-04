@@ -1,5 +1,6 @@
 import axios from "axios";
 import { useState } from "react";
+import { apiUrl } from "../utils/api";
 
 export default function UploadScan({ onScanComplete }) {
   const [file, setFile] = useState(null);
@@ -22,7 +23,7 @@ export default function UploadScan({ onScanComplete }) {
     try {
       setLoading(true);
       setMessage("Uploading and scanning...");
-      const res = await axios.post("http://127.0.0.1:5000/api/ransomware/upload-scan", formData, {
+      const res = await axios.post(apiUrl("/api/ransomware/upload-scan"), formData, {
         headers: { "Content-Type": "multipart/form-data" },
         timeout: 600000,
       });
@@ -58,3 +59,6 @@ export default function UploadScan({ onScanComplete }) {
     </div>
   );
 }
+
+
+

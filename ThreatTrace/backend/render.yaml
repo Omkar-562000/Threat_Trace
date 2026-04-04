@@ -1,5 +1,4 @@
 services:
-  # Backend API Service
   - type: web
     name: threattrace-backend
     runtime: python
@@ -11,12 +10,24 @@ services:
         value: 3.11.0
       - key: DEBUG
         value: False
+      - key: HOST
+        value: 0.0.0.0
+      - key: PORT
+        value: 10000
       - key: SECRET_KEY
         generateValue: true
       - key: JWT_SECRET_KEY
         generateValue: true
       - key: MONGO_URI
-        sync: false  # You'll add this manually in Render dashboard
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
+      - key: BACKEND_PUBLIC_URL
+        sync: false
+      - key: SOCKET_ASYNC_MODE
+        value: eventlet
       - key: MAIL_SERVER
         value: smtp.gmail.com
       - key: MAIL_PORT
@@ -24,6 +35,6 @@ services:
       - key: MAIL_USE_TLS
         value: True
       - key: MAIL_USERNAME
-        sync: false  # Add manually
+        sync: false
       - key: MAIL_PASSWORD
-        sync: false  # Add manually
+        sync: false

@@ -294,20 +294,23 @@ From `backend/`:
 pip install -r requirements.txt
 ```
 
-Create `backend/.env`:
+Copy `backend/.env.example` to `backend/.env` and update the values for your machine or deployment.
+
+Minimum required values:
 
 ```env
 MONGO_URI=your_mongodb_connection_string
 SECRET_KEY=your_secret_key
 JWT_SECRET_KEY=your_jwt_secret
-MAIL_USERNAME=your_email
-MAIL_PASSWORD=your_email_password
-MAIL_SERVER=smtp.gmail.com
-MAIL_PORT=587
-MAIL_USE_TLS=True
-MAIL_USE_SSL=False
+FRONTEND_URL=http://localhost:5173
+CORS_ALLOWED_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
+BACKEND_PUBLIC_URL=http://127.0.0.1:5000
 DEBUG=True
+HOST=0.0.0.0
+PORT=5000
 ```
+
+Email settings are optional. Leave `MAIL_USERNAME` and `MAIL_PASSWORD` blank if you do not need password-reset emails.
 
 Start the backend:
 
@@ -323,6 +326,19 @@ From `frontend/`:
 
 ```powershell
 npm install
+```
+
+Copy `frontend/.env.example` to `frontend/.env` and set:
+
+```env
+VITE_API_BASE=http://127.0.0.1:5000
+VITE_API_PORT=5000
+VITE_DEV_PROXY_TARGET=http://127.0.0.1:5000
+```
+
+Then start the frontend:
+
+```powershell
 npm run dev
 ```
 
@@ -349,6 +365,15 @@ python auto_file_registration.py
 3. Run the frontend with `npm run dev`
 4. Optionally run `python automation_runner.py`
 5. Open the frontend in the browser
+
+## What Other Users Need To Change
+
+Anyone cloning the project should only need to change environment values, not source code:
+
+- `backend/.env`: set `MONGO_URI`, `SECRET_KEY`, `JWT_SECRET_KEY`, `FRONTEND_URL`, `CORS_ALLOWED_ORIGINS`, and optionally mail settings.
+- `frontend/.env`: set `VITE_API_BASE` to the backend URL they will use.
+- `BACKEND_API_URL`: set this only if they want automation scripts to post to a non-local backend.
+- Windows-specific automation paths in `backend/automation_config.py`: adjust watched directories or monitored files if their machine layout is different.
 
 ## At a Glance
 
@@ -480,3 +505,4 @@ If you want to make the README even stronger, the next highest-value addition is
 - alert arriving in real time
 - audit tamper detection
 - location update on globe
+
