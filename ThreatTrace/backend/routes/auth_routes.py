@@ -3,6 +3,7 @@
 from flask import Blueprint, request, jsonify, current_app
 from flask_bcrypt import Bcrypt
 from flask_jwt_extended import create_access_token, verify_jwt_in_request, get_jwt_identity, get_jwt
+from flask_jwt_extended.exceptions import JWTExtendedException
 from flask_mail import Message
 from datetime import datetime, timedelta
 import uuid
@@ -284,8 +285,11 @@ def get_profile():
                 },
             }
         ), 200
+    except JWTExtendedException as e:
+        print("AUTH ERROR ON PROFILE:", e)
+        return jsonify({"status": "error", "message": str(e)}), 401
     except Exception as e:
-        print("❌ GET PROFILE ERROR:", e)
+        print("GET PROFILE ERROR:", e)
         return jsonify({"status": "error", "message": "Failed to fetch profile"}), 500
 
 
@@ -361,8 +365,11 @@ def update_profile():
                 },
             }
         ), 200
+    except JWTExtendedException as e:
+        print("AUTH ERROR ON PROFILE UPDATE:", e)
+        return jsonify({"status": "error", "message": str(e)}), 401
     except Exception as e:
-        print("❌ UPDATE PROFILE ERROR:", e)
+        print("UPDATE PROFILE ERROR:", e)
         return jsonify({"status": "error", "message": "Failed to update profile"}), 500
 
 
